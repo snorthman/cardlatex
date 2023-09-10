@@ -1,5 +1,6 @@
 import re
 import importlib.resources
+import xml.etree.ElementTree as xml
 from pathlib import Path
 from typing import List
 
@@ -98,19 +99,18 @@ class Tex:
         self._config['back'] = value
 
     def generate(self, dest: Path):
-        pass
+        root = xml.Element('cardlatex')
 
-    def build(self, dest: Path):
-        dest.mkdir(parents=True, exist_ok=True)
-
-        config = dict()
+    def _load_config(self):
+        props = set()
         matches: List[re.Match] = list(re.finditer(r'\\cardlatex\[(\w+)]\{', self._tex))
 
         for m, match in enumerate(matches):
             assert hasattr(Tex, prop := match.group(1)), (
                 KeyError(rf'unknown {cardlatexprop(prop)}'))
-            assert prop not in config, (
+            assert prop not in props, (
                 KeyError(rf'duplicate {cardlatexprop(prop)}'))
+            props.add(prop)
 
             b = 1
             rb: re.Match = None
@@ -127,6 +127,15 @@ class Tex:
                     ValueError(rf'{cardlatexprop()} found inside {cardlatexprop(prop)}'))
 
             setattr(self, prop, self._tex[match.end():endpos])
+
+    def _load_xml(self):
+        root = xml.parse(self._path.with_suffix('.xml')).getroot()
+
+    def build(self, dest: Path):
+        dest.mkdir(parents=True, exist_ok=True)
+        
+        self._load_config()
+        data = self._load_xml()
 
         rows = []
         for row in self.include:
