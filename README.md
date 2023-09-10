@@ -11,9 +11,11 @@ Configuration is defined in the `.tex` document. Example: `\cardlatex[bleed]{5mm
 
 - `width (length)`: `required` Width of the card.
 - `height (length)`: `required` Height of the card.
+- `ppi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
+This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, 300)` (with no length hint) will be positioned at 300 pixels from the top left.
 - `bleed (length)`: `default = 0` Bleed margin of the card.
 - `quality (number)`: `default = 100` Quality of `\includegraphics` images. Useful for testing. Must be between 1 and 100.
-- `include (number)`: Compile only specific rows. If left undefined, all rows in the XML are compiled.
+- `include (numbers)`: Compile only specific rows. If left undefined, all rows in the XML are compiled.
 - `front (text)`: `required` Front template of the card.
 - `back (text)`: Back template of the card. If left undefined, the front template is used for the back of the card.
 
@@ -29,6 +31,7 @@ Compile `.tex`/`.xml` file pairs.
 - `-p, --print <paper>`: Grid each row to fit on `<paper>`. See below for allowed `<paper>` values.
 - `-q, --quality <number>`: Override `\cardlatex[quality]` configuration to be set to `<number>`.
 - `-b, --bleed <length>`: Override `\cardlatex[bleed]` configuration to be set to `<length>`.
+- `-a, --all`: Override `\cardlatex[include]` configuration to be undefined.
 
 ## `cardlatex xml`
 

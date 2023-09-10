@@ -12,6 +12,12 @@ setup(
     install_requires=[
         'click'
     ],
+    extras_require={
+        'dev': [
+            'pytest',
+            'coverage',
+        ]
+    },
     entry_points={
         'console_scripts': [
             'cardlatex = cardlatex.__main__:cli',

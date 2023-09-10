@@ -1,0 +1,374 @@
+\input{preamble.tex}
+\input{preamble_diagrams.tex}
+\graphicsdir{hero_card}
+
+\setkeyfamily{herocard}
+\initkey{early}{0}
+\initkey{late}{0}
+\initkey{class}{undefined}
+\initkey{art}{undefined}
+\initkey{title}{undefined}
+\initkey{titlefont}{14}
+\initkey{ability}{}
+\initkey{abilityfont}{12}
+\initkey{lethality}{0}
+\initkey{lethalitytext}{}
+\initkey{lethalityfont}{18}
+\initkey{lethalitymax}{1}
+
+
+\newcommand{\front}[1][]{
+\begin{tikzcard}[2048/8.89]{\cardwidth}{\cardheight}
+	\tikzmath{
+		\lethalitysize = 1.20cm;
+	}	
+	\tikzset{
+		ability/.style={align=flush center,color=light,text width=\cardx-\margin-0.1cm,inner sep=1.5mm},
+		abilityedge/.style n args={1}{fill=##1,opacity=0.75}
+	}
+	
+	% coordinates
+	\path (10,10) coordinate (art1) -- (1456,740) coordinate[midway] (art) coordinate (art2);
+	\coordinate (ability) at (\cardx/2,830);
+	\coordinate (title) at (\cardx/2,740);
+	\coordinate (early) at (147,219);
+	\coordinate (late) at (147,509);
+	\path (B) -- ++(0,-70) coordinate (L1) -- ++(-\lethalitysize*2pt,0) coordinate (L0);
+	
+	% art
+	\begin{scope}
+		\clip (art1) rectangle (art2);
+		\node[anchor=center] at (art) {\includegraphics[width=6.15cm,keepaspectratio]{art/\getkey{class}_\getkey{art}.png}};
+	\end{scope}	
+	
+	% background
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{card/front_background.png}};
+	
+	\begin{scope}
+		% lethality text
+		\ifnumgreater{\getkey{lethality}}{0}{
+			\node[anchor=south,inner sep=2mm,yshift=\lethalitysize-1.5mm,fontsize=\getkey{lethalityfont},light] (lethality) at (L1) {\getkey{lethalitytext}};
+			\ifnumgreater{\getkey{lethalitymax}}{1}{
+				\node[anchor=west,xshift=1ex-2mm,fontsize=11,light] at (lethality.east) {\textbf{(max \getkey{lethalitymax})}};
+			}{}
+			\clip (lethality.north-|L) -- (lethality.north-|R) -- (TR) -- (TL) -- cycle;			
+		}{}
+		
+		% abilities
+		\node[ability,anchor=north,fontsize=\getkey{abilityfont}] (ability) at (ability) {\getkey{ability}};
+	\end{scope}
+	
+	\begin{background}
+	\ifnumgreater{\getkey{lethality}}{0}{
+		\fill[light,opacity=0.1] (lethality.north-|ability.south west) -- (lethality.north-|ability.south east) -- (BR) -- (BL) -- cycle;
+	}{}
+	\end{background}
+
+	% cost
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{card/front_banner_2_yellow.png}};
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{card/front_banner_1_green.png}};
+	\node[anchor=center,opacity=0.95] at (early) {\includegraphics[height=0.75cm]{values/\getkey{early}.png}};
+	\node[anchor=center,opacity=0.95] at (late) {\includegraphics[height=0.75cm]{values/\getkey{late}.png}};
+	
+	% frame
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{card/front_frame_\getkey{class}.png}};
+	
+	% title
+	\node[text width=\cardx,align=center,light,anchor=center,strut,fontsize=\getkey{titlefont}] at (title) {\fontTitle{\getkey{title}}};
+	
+	% lethality zones
+	\foreach \c/\l in {0/5,1/4,2/53,3/42,4/531,5/42,6/53,7/4,8/5}{
+		\IfSubStr{\l}{\getkey{lethality}}{
+			\node[anchor=south,xshift=\lethalitysize*\c*0.5] at (L0) {\includegraphics[width=1.15cm]{front_lethality.png}};
+		}
+	}	
+\end{tikzcard}
+\resetkeys
+}
+
+\newcommand{\back}{
+\begin{tikzcard}[2048/8.89]{\cardwidth}{\cardheight}
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{back_background.png}};
+	\node[anchor=center] at (C) {\includegraphics[width=2.33cm]{hero/\getkey{class}_symbol.png}};
+	\node at (0,0) {\includegraphics[width=\cardx,height=\cardy]{back_frames.png}};
+\end{tikzcard}
+\resetkeys
+}
+
+
+\begin{document}
+	% 9 cards per class (7 designs)
+	% 1 rest
+	% 2 basic attack
+	% 1 special attack (+move)
+	% 2 basic lethality+move
+	% 1 special lethality+move
+	% 1 ultimate
+	% 1 other
+	
+	\newcommand{\hemopriestbasicattack}{
+		% basic attack (2)
+		\def\diagramattack{\diagram{-1}{
+				\diagramability{attack}{3}
+			}
+		}
+		\def\diagramheal{\diagram{1}{
+				\diagramability{heal}{1}
+			}	
+		}
+		\setkey{class}{hemopriest}
+		\setkey{early}{5}
+		\setkey{late}{3}
+		\setkey{art}{bloodthirst}
+		\setkey{title}{Bloodthirst}
+		\setkey{ability}{\diagramattack If successful, \diagramheal}
+		\front[2]
+	}
+
+	\newcommand{\hemopriestspecialattack}{
+		% special attack
+		\def\diagramjumpattack{\diagram{1}{
+				\diagramability{move}{2}
+				\diagramabilitysub{jump}
+				\diagramability{attack}{3}
+			}
+		}
+		\def\diagrammoveattack{\diagram{0}{
+				\diagramability{move}{1}
+				\diagramability{attack}{3}
+			}
+		}
+		\setkey{class}{hemopriest}
+		\setkey{fast1}{1}
+		\setkey{slow3}{1}
+		\setkey{priority}{10}
+		\setkey{stamina}{3}
+		\setkey{art}{with_reckless_abandon}
+		\setkey{title}{With Reckless Abandon}
+		\setkey{titlefont}{13}
+		\setkey{fast}{Lose 1~\life. \diagramjumpattack}
+		\setkey{slow}{\diagrammoveattack}
+		\front
+	}
+
+	\newcommand{\hemopriestbasiclethality}{
+		% basic lethality (2)
+		\def\diagramlethality[##1]{\diagram{1}{
+				\diagramability{move}{1}
+				\diagramability{lethality}{##1}
+			}
+		}
+		\setkey{class}{hemopriest}
+		\setkey{fast2}{1}
+		\setkey{slow3}{1}
+		\setkey{priority}{20}
+		\setkey{stamina}{3}
+		\setkey{art}{seeing_red}
+		\setkey{title}{Seeing Red}
+		\setkey{fast}{Lose 1~\life. \diagramlethality[3]}
+		\setkey{slow}{\vspace{-0.5em}\diagramlethality[1]}
+		\setkey{lethality}{3}
+		\setkey{lethalitytext}{\attack[+3]}
+		\front[2]
+	}
+
+	\newcommand{\hemopriestspeciallethality}{
+		% special lethality
+		\def\diagramlethality{\diagram{0}{
+				\diagramability{lethality}{x}
+			}
+		}
+		\setkey{class}{hemopriest}
+		\setkey{fast1}{1}
+		\setkey{fast2}{1}
+		\setkey{fast3}{1}
+		\setkey{priority}{22}
+		\setkey{stamina}{2}
+		\setkey{art}{ritual_of_blood}
+		\setkey{title}{Ritual of Blood}
+		\setkey{fast}{Discard up to 5 \textbf{Blood}. \diagramlethality where X is the number of discarded \textbf{Blood}.}
+		\setkey{lethality}{5}
+		\setkey{lethalitytext}{\attack+2}
+		\setkey{lethalitymax}{2}
+		\front
+	}
+
+	\newcommand{\hemopriestultimate}{
+		% ultimate
+		\def\diagramjump{\diagram{0}{
+				\diagramability{move}{1}
+				\diagramabilitysub{jump}
+			}
+		}
+		\def\diagramattack{\diagram{0}{
+				\diagramability{attack}{1}
+			}
+		}
+		\setkey{class}{hemopriest}
+		\setkey{fast2}{1}
+		\setkey{fast3}{1}
+		\setkey{priority}{50}
+		\setkey{stamina}{4}
+		\setkey{art}{a_dance_of_death}
+		\setkey{title}{A Dance of Death}
+		\setkey{fast}{Discard an adjacent \textbf{Blood} to \diagramjump to that area, then \diagramattack Repeat this action any number of times.}
+		\front
+	}
+
+	\newcommand{\hemopriestspecial}{
+		% special
+		\def\diagrammove[##1]{\diagram{##1}{
+				\diagramability{move}{1}
+			}
+		}
+		\def\diagramheal{\diagram{-1}{
+				\diagramability{heal}{2}
+			}
+		}
+		\setkey{class}{hemopriest}
+		\setkey{fast2}{1}
+		\setkey{slow3}{1}
+		\setkey{priority}{40}
+		\setkey{stamina}{3}
+		\setkey{art}{willing_sacrifice}
+		\setkey{title}{Willing Sacrifice}
+		\setkey{fast}{Lose 1~\life. \diagrammove[0] Target ally within \textbf{\range~1} gains 2~\life.}
+		\setkey{slowfont}{11}
+		\setkey{slow}{\diagrammove[-1]\vspace{0.5em} \diagramheal if target ally within \textbf{\range~1} loses 1~\life.}
+		\front
+	}
+	
+	
+	\newcommand{\pyroguardbasicattack}{
+		\def\diagramattack{\diagram{-1}{
+				\diagramability{attack}{4}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{early}{5}
+		\setkey{late}{3}
+		\setkey{art}{flame_reborn}
+		\setkey{title}{Flame Reborn}
+		\setkey{ability}{\diagramattack If successful, place a \textbf{Flame} on its position.\\If you already have 2~\textbf{Flame}, you must replace one.}		
+		\front[2]
+	}
+	
+	\newcommand{\pyroguardspecialattack}{
+		\def\diagramattack[##1]{\diagram{##1}{
+				\diagramability{attack}{2}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{fast2}{1}
+		\setkey{fast3}{1}
+		\setkey{stamina}{3}
+		\setkey{priority}{61}
+		\setkey{art}{conflagration}
+		\setkey{title}{Conflagration}
+		\setkey{fast}{\diagramattack[-1] Each \textbf{Flame} may also \diagramattack[0] copying any \lethality bonuses.}		
+		\front
+	}
+	
+	\newcommand{\pyroguardbasiclethality}{
+		\def\diagramlethalityx{\diagram{-1}{
+				\diagramability{move}{2}
+				\diagramability{lethality}{1+x}
+			}
+		}
+		\def\diagramlethality{\diagram{2}{
+				\diagramability{move}{2}
+				\diagramability{lethality}{2}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{fast2}{1}
+		\setkey{slow3}{1}
+		\setkey{stamina}{3}
+		\setkey{priority}{11}
+		\setkey{art}{ignition_barrier}
+		\setkey{title}{Ignition Barrier}
+		\setkey{fast}{\diagramlethalityx where \textbf{X} is for every \textbf{Flame} within \range[1].}	
+		\setkey{slow}{\diagramlethality}	
+		\setkey{lethality}{3}
+		\setkey{lethalitytext}{\attack[+2],\shield[+2]}	
+		\front[2]
+	}
+	
+	\newcommand{\pyroguardspeciallethality}{
+		\def\diagramlethality{\diagram{-1}{
+				\diagramability{move}{1}
+				\diagramability{lethality}{5}
+			}
+		}
+		\def\diagramlethalityslow{\diagram{2}{
+				\diagramability{move}{2}
+				\diagramability{lethality}{3}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{fast1}{1}
+		\setkey{slow2}{1}
+		\setkey{slow3}{1}
+		\setkey{stamina}{4}
+		\setkey{priority}{21}
+		\setkey{art}{pyroclastic_plating}
+		\setkey{title}{Pyroclastic Plating}
+		\setkey{fast}{\diagramlethality if a nearby \textbf{Flame} is removed.}	
+		\setkey{slow}{\diagramlethalityslow}	
+		\setkey{lethality}{5}
+		\setkey{lethalitytext}{\shield[+2]}	
+		\setkey{lethalitymax}{2}
+		\front
+	}
+	
+	\newcommand{\pyroguardultimate}{
+		\def\diagrammove{\diagram{-1}{
+				\diagramability{move}{1}
+			}
+		}
+		\def\diagrambomb{\diagram{0}{
+				\diagramability{move}{2}
+				\diagramability{attack}{3}
+				\diagramabilitysub[3]{target}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{fast2}{1}
+		\setkey{fast2}{1}
+		\setkey{stamina}{4}
+		\setkey{priority}{82}
+		\setkey{art}{living_bomb}
+		\setkey{title}{Living Bomb}
+		\setkey{fast}{\diagrammove Target gains: \diagrambomb This attack hurts both friend and foe.}	
+		\front
+	}
+	
+	\newcommand{\pyroguardother}{
+		\def\diagramattack{\diagram{1}{
+				\diagramability{attack}{3}
+			}
+		}
+		\setkey{class}{pyroguard}
+		\setkey{early}{1}
+		\setkey{late}{1}
+		\setkey{art}{portal_of_pyres}
+		\setkey{title}{Portal of Pyres}
+		\setkey{ability}{Switch the position of any ally, or yourself, with any \textbf{Flame}.}	
+		\front
+	}
+	
+	
+	\hemopriestbasicattack
+%	\hemopriestspecialattack
+%	\hemopriestbasiclethality
+%	\hemopriestspeciallethality
+%	\hemopriestultimate
+%	\hemopriestspecial
+%
+	\pyroguardbasicattack
+%	\pyroguardspecialattack
+%	\pyroguardbasiclethality
+%	\pyroguardspeciallethality
+%	\pyroguardultimate
+%	\pyroguardother
+\end{document}

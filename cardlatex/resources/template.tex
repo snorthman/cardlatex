@@ -1,0 +1,93 @@
+\documentclass[crop,multi=tikzpicture,varwidth=false,border=0cm]{standalone}
+\usepackage{colortbl}
+\usepackage{tikz}
+\usepackage{fontspec}
+\usepackage{parskip}
+\usepackage{textcomp}
+\usepackage{tcolorbox}
+\usepackage{multirow}
+\usepackage{xspace}
+\usepackage{xstring}
+\usepackage{xparse}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{relsize}
+\usepackage{graphbox}
+\usepackage{tabularx}
+\usepackage{changepage}
+\usepackage{etoolbox}
+\usetikzlibrary{arrows.meta,math,calc,scopes,fadings,backgrounds}
+%\usepgflibrary{fpu}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TIKZ LAYERS
+
+\pgfdeclarelayer{print}
+\pgfdeclarelayer{background}
+\pgfdeclarelayer{foreground}
+\pgfsetlayers{print,background,main,foreground}
+
+\newenvironment{background}{\begin{pgfonlayer}{background}}{\end{pgfonlayer}}
+\newenvironment{foreground}{\begin{pgfonlayer}{foreground}}{\end{pgfonlayer}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% KEYS
+
+\newcommand{\setkeyfamily}[1]{\def\currentfamily{#1}\pgfkeys{/\currentfamily/.is family,/\currentfamily/reset/.code={}}}
+\newcommand{\initkey}[2]{\newtoggle{\currentfamily#1}\pgfkeys{/\currentfamily, #1/.initial={#2}, reset/.append code={\pgfkeys{/\currentfamily/#1={#2}}\togglefalse{\currentfamily#1}}}}
+\newcommand{\setkey}[2]{\pgfkeys{/\currentfamily, #1={#2}}\toggletrue{\currentfamily#1}}
+\newcommand{\getkey}[1]{\pgfkeysvalueof{/\currentfamily/#1}}
+\newcommand{\ifkey}[3]{\iftoggle{\currentfamily#1}{#2}{#3}}
+\newcommand{\resetkeys}{\pgfkeys{/\currentfamily/reset}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TIKZCARD
+
+\def\bleed{<$bleed$>}
+\def\width{<$width$> - \bleed}
+\def\height{<$height$> - \bleed}
+
+\newenvironment{tikzcard}[3][0]{
+\tikzmath{
+	coordinate \card;
+	\card = (#2,#3);
+}
+
+\begin{tikzpicture}
+	\coordinate (TL) at (0,0);
+	\coordinate (TR) at (\cardx,0);
+	\coordinate (BR) at (\cardx,-\cardy);
+	\coordinate (BL) at (0,-\cardy);
+	\coordinate (T) at (\cardx/2,0);
+	\coordinate (R) at (\cardx,-\cardy/2);
+	\coordinate (B) at (\cardx/2,-\cardy);
+	\coordinate (L) at (0,-\cardy/2);
+	\coordinate (C) at (\cardx/2,-\cardy/2);
+
+	\pgfmathparse{#1}
+	\ifdimequal{\pgfmathresult pt}{0pt}{}{
+		\pgfkeys{/pgf/fpu,/pgf/fpu/output format=fixed}
+		\tikzmath{
+			\resolutionx=(10/(#1))*(\cardx/(\cardx+\bleed));
+			\resolutiony=(10/(#1))*(\cardy/(\cardy+\bleed));
+		}
+		\pgfsetxvec{\pgfpoint{\resolutionx mm}{0cm}}
+		\pgfsetyvec{\pgfpoint{0mm}{-\resolutiony mm}}
+		\pgfkeys{/pgf/fpu=false}
+	}
+}{
+	\begin{pgfonlayer}{print}
+		\draw[fill=black] 	  ([xshift=-\bleed    ,yshift=     \bleed]TL) rectangle ([xshift= \bleed    ,yshift=-    \bleed]BR);
+		\draw[line width=1mm] ([xshift=-\bleed*2.5,yshift= 0.5*\bleed]TL) --        ([xshift= \bleed*2.5,yshift= 0.5*\bleed]TR);
+		\draw[line width=1mm] ([xshift= \bleed*0.5,yshift= 2.5*\bleed]TR) --        ([xshift= \bleed*0.5,yshift=-2.5*\bleed]BR);
+		\draw[line width=1mm] ([xshift= \bleed*2.5,yshift=-0.5*\bleed]BR) --        ([xshift=-\bleed*2.5,yshift=-0.5*\bleed]BL);
+		\draw[line width=1mm] ([xshift=-\bleed*0.5,yshift=-2.5*\bleed]BL) --        ([xshift=-\bleed*0.5,yshift= 2.5*\bleed]TL);
+	\end{pgfonlayer}
+	\pgfsetxvec{\pgfpoint{1cm}{0cm}}
+	\pgfsetyvec{\pgfpoint{0cm}{1cm}}
+\end{tikzpicture}
+}
+
+\begin{document}
+
+\end{document}
