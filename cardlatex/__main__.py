@@ -34,7 +34,10 @@ def xml(tex: Tuple[Path, ...], orphan: bool):
     """
     Copy XML files from source to destination.
     """
-    pass
+    for path in tex:
+        path = Path(path)
+        t = Tex(path)
+        t.generate()
 
 
 def pwd():

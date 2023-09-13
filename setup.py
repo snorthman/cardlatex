@@ -10,7 +10,8 @@ setup(
     author_email='',
     description='',
     install_requires=[
-        'click'
+        'click',
+        'pandas'
     ],
     extras_require={
         'dev': [

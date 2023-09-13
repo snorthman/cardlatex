@@ -1,17 +1,25 @@
 import re
 import importlib.resources
 import xml.etree.ElementTree as xml
+import xml.dom.minidom as minidom
 from pathlib import Path
 from typing import List
+
+import pandas
+import pandas as pd
 
 
 def cardlatexprop(prop: str = ''):
     return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
 
 
+reserved_variables = ['id', 'count']
+
+
 class Tex:
     def __init__(self, tex: Path):
         self._path = tex
+        self._path_xlsx = self._path.with_suffix('.xlsx')
         self._config = dict()
         self._template = self.template()
 
@@ -98,8 +106,15 @@ class Tex:
     def back(self, value: str) -> str:
         self._config['back'] = value
 
-    def generate(self, dest: Path):
-        root = xml.Element('cardlatex')
+    def generate(self):
+        self._load_config()
+
+        variables = {r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self.front + self.back)}
+        if restricted_variables := [var for var in variables if var in reserved_variables]:
+            raise ValueError(f'reserved variables {restricted_variables} found')
+
+        data = {key: [] for key in variables}
+        pd.DataFrame(data).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
 
     def _load_config(self):
         props = set()
@@ -128,14 +143,17 @@ class Tex:
 
             setattr(self, prop, self._tex[match.end():endpos])
 
-    def _load_xml(self):
-        root = xml.parse(self._path.with_suffix('.xml')).getroot()
+    def _load_xslx(self):
+        if self._path_xlsx.exists():
+            df = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
+            pass
+        return None
 
     def build(self, dest: Path):
         dest.mkdir(parents=True, exist_ok=True)
         
         self._load_config()
-        data = self._load_xml()
+        data = self._load_xslx()
 
         rows = []
         for row in self.include:
