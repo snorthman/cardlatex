@@ -19,11 +19,11 @@ This is helpful when defining pixel-perfect coordinate positioning, as a node at
 - `front (text)`: `required` Front template of the card.
 - `back (text)`: Back template of the card. If left undefined, the front template is used for the back of the card.
 
-## `cardlatex compile`
+## `cardlatex build`
 
 Compile `.tex`/`.xml` file pairs.
 
-`cardlatex compile [<tex files>] [flags]`
+`cardlatex build [<tex files>] [flags]`
 
 ### Options
 

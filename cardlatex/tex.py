@@ -1,19 +1,15 @@
-import re
 import importlib.resources
-import xml.etree.ElementTree as xml
-import xml.dom.minidom as minidom
+import re
+import tempfile
 from pathlib import Path
 from typing import List
 
-import pandas
+import numpy as np
 import pandas as pd
 
 
 def cardlatexprop(prop: str = ''):
     return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
-
-
-reserved_variables = ['id', 'count']
 
 
 class Tex:
@@ -64,6 +60,14 @@ class Tex:
         self._set_length_prop('bleed', value)
 
     @property
+    def dpi(self) -> str:
+        return self._config.get('dpi', '0')
+
+    @dpi.setter
+    def dpi(self, value: str):
+        self._config['dpi'] = str(float(value))
+
+    @property
     def quality(self) -> str:
         return self._config.get('quality', '100')
 
@@ -95,7 +99,7 @@ class Tex:
         return self._config['front']
 
     @front.setter
-    def front(self, value: str) -> str:
+    def front(self, value: str) :
         self._config['front'] = value
 
     @property
@@ -103,17 +107,15 @@ class Tex:
         return self._config.get('back', self.front)
 
     @back.setter
-    def back(self, value: str) -> str:
+    def back(self, value: str) :
         self._config['back'] = value
+
+    def _find_variables(self) -> frozenset[str]:
+        return frozenset({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self.front + self.back)})
 
     def generate(self):
         self._load_config()
-
-        variables = {r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self.front + self.back)}
-        if restricted_variables := [var for var in variables if var in reserved_variables]:
-            raise ValueError(f'reserved variables {restricted_variables} found')
-
-        data = {key: [] for key in variables}
+        data = {key: [] for key in self._find_variables()}
         pd.DataFrame(data).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
 
     def _load_config(self):
@@ -145,21 +147,48 @@ class Tex:
 
     def _load_xslx(self):
         if self._path_xlsx.exists():
-            df = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
-            pass
-        return None
+            xlsx = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
+            unknowns = self._find_variables().symmetric_difference(xlsx)
+            if unknowns:
+                print(f'unknown columns [{", ".join(unknowns)}] are ignored')
 
-    def build(self, dest: Path):
+            if self.include:
+                rows = len(xlsx)
+                rows_expected = max(self.include) + 1
+                if rows_expected - rows > 0:
+                    rows_extra = pd.DataFrame(np.nan, columns=xlsx.columns, index=range(rows, rows_expected))
+                    xlsx = pd.concat([xlsx, rows_extra])
+
+            return xlsx
+        return pd.DataFrame()
+
+    def build(self, dest: Path, **kwargs):
         dest.mkdir(parents=True, exist_ok=True)
         
         self._load_config()
         data = self._load_xslx()
+        variables = self._find_variables()
 
-        rows = []
-        for row in self.include:
-            pass
-        # prepare <$front$> and <$back$> val
+        tikz = r'\begin{tikzcard}[' + self.dpi + ']{' + self.width + '}{' + self.height + '}{%'
+        content = []
+        edges = [self.front]
+        if kwargs['mirror'] or 'back' in self._config:
+            edges.append(self.back)
 
+        for row in range(len(data)) if kwargs['build_all'] else self.include:
+            for edge in edges:
+                for var in variables:
+                    item = data[var][row]
+                    edge = edge.replace(f'<${var}$>', '' if pd.isna(item) else item)
+                content.append(tikz + edge + '}%\n')
+
+        template = self._template
         for r in re.finditer(r'<\$(\w+)\$>', self._template):
-            propv = getattr(self, r.group(1))
+            value = getattr(self, r.group(1))
+            template = template.replace(r.group(), value)
+
+        tex = template + '\n\\begin{document}\n\n' + '\n'.join(content) + '\n\\end{document}'
+        # maintain some form of \ifkey functionality
+
+        print(tex)
 
