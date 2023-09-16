@@ -2,8 +2,10 @@
 \cardlatex[height]{3cm}
 \cardlatex[bleed]{0.5cm}
 \cardlatex[quality]{50}
-\cardlatex[include]{0...2,4}
+\cardlatex[include]{0...1,3}
 \cardlatex[front]{
-    \node[anchor=north,yshift=0.25cm] at (T) {<$title$>};
+    \if<$title$>{
+        \node[anchor=north,yshift=0.25cm,white] at (T) {\textbf{<$title$>}};
+    }{}
     \node[anchor=north east] at (0,0) {\includegraphics[width=2cm]{art/<$art$>.png}};
 }

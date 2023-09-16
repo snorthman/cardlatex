@@ -11,7 +11,8 @@ setup(
     description='',
     install_requires=[
         'click',
-        'pandas'
+        'pandas',
+        'wand'
     ],
     extras_require={
         'dev': [

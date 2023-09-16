@@ -31,17 +31,7 @@
 \newenvironment{foreground}{\begin{pgfonlayer}{foreground}}{\end{pgfonlayer}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% KEYS
-
-\newcommand{\setkeyfamily}[1]{\def\currentfamily{#1}\pgfkeys{/\currentfamily/.is family,/\currentfamily/reset/.code={}}}
-\newcommand{\initkey}[2]{\newtoggle{\currentfamily#1}\pgfkeys{/\currentfamily, #1/.initial={#2}, reset/.append code={\pgfkeys{/\currentfamily/#1={#2}}\togglefalse{\currentfamily#1}}}}
-\newcommand{\setkey}[2]{\pgfkeys{/\currentfamily, #1={#2}}\toggletrue{\currentfamily#1}}
-\newcommand{\getkey}[1]{\pgfkeysvalueof{/\currentfamily/#1}}
-\newcommand{\ifkey}[3]{\iftoggle{\currentfamily#1}{#2}{#3}}
-\newcommand{\resetkeys}{\pgfkeys{/\currentfamily/reset}}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% TIKZCARD
+% CARDLATEX
 
 \def\bleed{<$bleed$>}
 \def\width{<$width$> - \bleed}
@@ -87,3 +77,6 @@
 	\pgfsetyvec{\pgfpoint{0cm}{1cm}}
 \end{tikzpicture}
 }
+
+\newcommand{\cardlatex}[2][]{}
+\newcommand{\ifvar}[3]{\iftoggle{#1}{#2}{#3}}

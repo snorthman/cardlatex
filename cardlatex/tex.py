@@ -1,15 +1,25 @@
 import importlib.resources
 import re
+import os
 import tempfile
+import hashlib
 from pathlib import Path
-from typing import List
+from typing import List, Set
 
 import numpy as np
 import pandas as pd
 
+from .image import Image
+
 
 def cardlatexprop(prop: str = ''):
     return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
+
+
+def sha256(encode: str) -> str:
+    obj = hashlib.sha1()
+    obj.update(encode.encode('utf-8'))
+    return obj.hexdigest()
 
 
 class Tex:
@@ -69,7 +79,7 @@ class Tex:
 
     @property
     def quality(self) -> str:
-        return self._config.get('quality', '100')
+        return self._config.get('quality', 100)
 
     @quality.setter
     def quality(self, value: int):
@@ -88,7 +98,8 @@ class Tex:
         for v in values:
             if r := re.match(r'(\d+)\.{2,3}(\d+)', v):
                 left, right = int(r.group(1)), int(r.group(2))
-                assert left <= right, ValueError(rf'{left} is larger than {right} in {v} for {cardlatexprop("include")}')
+                assert left <= right, ValueError(
+                    rf'{left} is larger than {right} in {v} for {cardlatexprop("include")}')
                 include.extend(range(left, right + 1))
             else:
                 include.append(int(v))
@@ -99,7 +110,7 @@ class Tex:
         return self._config['front']
 
     @front.setter
-    def front(self, value: str) :
+    def front(self, value: str):
         self._config['front'] = value
 
     @property
@@ -107,11 +118,14 @@ class Tex:
         return self._config.get('back', self.front)
 
     @back.setter
-    def back(self, value: str) :
+    def back(self, value: str):
         self._config['back'] = value
 
     def _find_variables(self) -> frozenset[str]:
         return frozenset({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self.front + self.back)})
+
+    def _get_cachedir(self) -> Path:
+        return Path(tempfile.gettempdir()) / 'cardlatex' / sha256(self._path.resolve().as_posix())
 
     def generate(self):
         self._load_config()
@@ -162,33 +176,96 @@ class Tex:
             return xlsx
         return pd.DataFrame()
 
-    def build(self, dest: Path, **kwargs):
-        dest.mkdir(parents=True, exist_ok=True)
-        
-        self._load_config()
-        data = self._load_xslx()
+    def _prepare_tex(self, data: pd.DataFrame, **kwargs):
         variables = self._find_variables()
 
-        tikz = r'\begin{tikzcard}[' + self.dpi + ']{' + self.width + '}{' + self.height + '}{%'
-        content = []
+        mirror = kwargs.get('mirror', False)
+        build_all = kwargs.get('build_all', False)
+
+        content = ['']
+        toggles = set()
+
+        tikz = r'\begin{tikzcard}[' + self.dpi + ']{' + self.width + '}{' + self.height + '}%\n'
         edges = [self.front]
-        if kwargs['mirror'] or 'back' in self._config:
+        if mirror or 'back' in self._config:
             edges.append(self.back)
 
-        for row in range(len(data)) if kwargs['build_all'] else self.include:
+        for row in range(len(data)) if build_all else self.include:
+            card = ['']
             for edge in edges:
-                for var in variables:
-                    item = data[var][row]
-                    edge = edge.replace(f'<${var}$>', '' if pd.isna(item) else item)
-                content.append(tikz + edge + '}%\n')
+                for key in variables:
+                    item = data[key][row]
+                    value = '' if pd.isna(item) else item
+
+                    if re.search(r'\\if<\$' + key + r'\$>', edge):
+                        toggles.add(key)
+                        card[0] += (r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}\n'
+
+                    edge = edge.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}')
+                    edge = edge.replace(f'<${key}$>', value)
+
+                card.append(tikz + edge + '\n\\end{tikzcard}%\n')
+            content.extend(card)
+
+        content = '\n'.join(content)
+        toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
 
         template = self._template
         for r in re.finditer(r'<\$(\w+)\$>', self._template):
             value = getattr(self, r.group(1))
             template = template.replace(r.group(), value)
 
-        tex = template + '\n\\begin{document}\n\n' + '\n'.join(content) + '\n\\end{document}'
-        # maintain some form of \ifkey functionality
+        tex_blocks = [
+            (None, template),
+            ('user tex', self._tex),
+            ('newtoggles', toggles),
+            ('document', '\\begin{document}\n'),
+            (None, content.replace('\n', '\n\t')),
+            (None, '\n\\end{document}')
+        ]
+
+        tex = ''
+        for header, block in tex_blocks:
+            if header:
+                tex += '\n\n' + '%' * 68 + '\n% ' + header.upper() + '\n\n'
+            tex += block
+
+        return tex
+
+    def _resample_images(self, tex: str, **kwargs):
+        quality = kwargs.get('quality') or self.quality
+        if quality == 100:
+            return
+
+        begin_document = re.search(r'\\begin{document}', tex)
+        assert begin_document, r'no \begin{document}?'
+
+        # untested
+        graphics_dirs = [self._path.parent]
+        for r in re.finditer(r'\\graphicspath{(.+)}', tex):
+            for p in re.finditer(r'{.+}', r.group(1)):
+                path = p.group()
+                if path.startswith('.'):  # relative path
+                    graphics_dirs.append(graphics_dirs[0] / path)
+                else:
+                    graphics_dirs.append(Path(path))
+
+        cache_dir = self._get_cachedir()
+        cache_dir.mkdir(exist_ok=True, parents=True)
+
+        images: Set[Image] = set({Image(cache_dir, Path(r.group(1))) for r in re.finditer(r'\\includegraphics.*?{([^}]+)}', tex[begin_document.end():])})
+        for img in images:
+            for graphics_dir in graphics_dirs:
+                img.resample(graphics_dir, quality)
+            if not img.resampled:
+                raise FileNotFoundError(img.path.as_posix())
+
+    def build(self, dest: Path, **kwargs):
+        dest.mkdir(parents=True, exist_ok=True)
+
+        self._load_config()
+        data = self._load_xslx()
+        tex = self._prepare_tex(data, **kwargs)
+        self._resample_images(tex, **kwargs)
 
         print(tex)
-

@@ -16,6 +16,7 @@ def tex():
     root_output.mkdir()
 
     shutil.copy(root / 'input/basic.tex', root_output_tex := root_output / 'basic.tex')
+    shutil.copytree(root / 'input/art', root_output / 'art')
     return root_output_tex.as_posix()
 
 
