@@ -1,4 +1,3 @@
-from typing import TextIO
 import os
 from pathlib import Path
 

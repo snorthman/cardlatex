@@ -35,8 +35,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CARDLATEX
 
-\def\bleed{<$bleed$>}
-\def\spacing{<$spacing$>}
+\def\bleed{0.3cm}
+\def\spacing{0cm}
 
 \newenvironment{tikzcard}[3][0]{
 \tikzmath{
@@ -83,3 +83,42 @@
 
 \newcommand{\cardlatex}[2][]{}
 \newcommand{\ifvar}[3]{\iftoggle{#1}{#2}{#3}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% USER TEX
+
+\cardlatex[width]{2cm}
+\cardlatex[height]{3cm}
+\cardlatex[bleed]{0.3cm}
+\cardlatex[quality]{50}
+\cardlatex[include]{0}
+\cardlatex[front]{
+    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
+    \if<$title$>{
+        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
+    }{}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% NEWTOGGLES
+
+\newtoggle{title}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT
+
+\begin{document}
+
+	\toggletrue{title}
+	
+	\begin{tikzcard}[0]{2cm}{3cm}%
+	
+	    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
+	    \ifvar{title}{
+	        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hello2}};
+	    }{}
+	
+	\end{tikzcard}%
+	
+\end{document}

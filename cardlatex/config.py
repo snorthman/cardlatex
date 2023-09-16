@@ -1,15 +1,5 @@
-import importlib.resources
 import re
-import os
-import tempfile
-import hashlib
-from pathlib import Path
-from typing import List, Set
-
-import numpy as np
-import pandas as pd
-
-from .image import Image
+from typing import List
 
 
 def cardlatexprop(prop: str = ''):
@@ -52,6 +42,12 @@ class Config:
             ValueError(f'invalid value "{value}" for {prop}'))
         self._config[prop] = value
 
+    def __getitem__(self, item):
+        return self._config[item]
+
+    def __contains__(self, item):
+        return item in self._config
+
     @property
     def width(self) -> str:
         return self._config['width']
@@ -70,11 +66,19 @@ class Config:
 
     @property
     def bleed(self) -> str:
-        return self._config.get('bleed', '0')
+        return self._config.get('bleed', '0cm')
 
     @bleed.setter
     def bleed(self, value: str):
         self._set_length_prop('bleed', value)
+
+    @property
+    def spacing(self) -> str:
+        return self._config.get('spacing', '0cm')
+
+    @spacing.setter
+    def spacing(self, value: str):
+        self._set_length_prop('spacing', value)
 
     @property
     def dpi(self) -> str:

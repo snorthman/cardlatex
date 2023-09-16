@@ -4,11 +4,12 @@ from pathlib import Path
 
 import click
 
-from . import PaperEnum
+from . import PaperEnum, version
 from .tex import Tex
 
 
 @click.group()
+@click.version_option(version)
 def cli():
     pass
 
@@ -21,13 +22,12 @@ def cli():
 @click.option('-p', '--print', 'paper', type=click.Choice([p.value for p in PaperEnum]), default=PaperEnum.A4.value)
 @click.option('-q', '--quality', type=click.IntRange(1, 100))
 def build(tex: Tuple[Path, ...], combine: bool, build_all: bool, mirror: bool, paper: PaperEnum, quality: int):
-    root = pwd()
     args = ['combine', 'build_all', 'mirror', 'paper', 'quality']
     kwargs = {key: value for key, value in locals().items() if key in args}
     for path in tex:
         path = Path(path)
         t = Tex(path)
-        t.build(root / path.name, **kwargs)
+        t.build(**kwargs)
 
 
 @cli.command()
@@ -41,12 +41,6 @@ def generate(tex: Tuple[Path, ...], orphan: bool):
         path = Path(path)
         t = Tex(path)
         t.generate()
-
-
-def pwd():
-    path = Path(tempfile.gettempdir()) / 'cardlatex'
-    path.mkdir(exist_ok=True)
-    return path
 
 
 if __name__ == '__main__':
