@@ -15,7 +15,7 @@ class Config:
 
         for m, match in enumerate(matches):
             e = match.end()
-            if tex[tex[:e].rfind('\n'):e].find('%'):
+            if tex[tex[:e].rfind('\n'):e].find('%') >= 0:
                 continue
 
             assert hasattr(Config, prop := match.group(1)), (
