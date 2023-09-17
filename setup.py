@@ -26,7 +26,7 @@ if __name__ == '__main__':
         },
         entry_points={
             'console_scripts': [
-                'cardlatex = cardlatex.__main__:cli',
+                'cardlatex = cardlatex.__main__:build',
             ],
         }
     )

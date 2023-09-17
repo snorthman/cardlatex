@@ -45,55 +45,62 @@ class Tex:
         with importlib.resources.open_text('cardlatex.resources', 'template.tex') as f:
             return f.read()
 
-    def generate(self):
-        data = {key: [] for key in self._variables}
-        pd.DataFrame(data).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
+    @property
+    def cache_dir(self) -> Path:
+        return self._cache_dir
 
-    def _load_xslx(self):
-        if self._path_xlsx.exists():
-            xlsx = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
-            unknowns = self._variables.symmetric_difference(xlsx)
-            if unknowns:
-                print(f'unknown columns [{", ".join(unknowns)}] are ignored')
+    def generate(self):
+        if self._variables:
+            if self._path_xlsx.exists():
+                try:
+                    data_existing = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
+                except ValueError as e:
+                    raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
+
+                data_columns = pd.Index([*sorted(self._variables)] + [c for c in sorted(data_existing) if c not in self._variables])
+                data_existing = data_existing.reindex(columns=data_columns)
+            else:
+                data_columns = pd.Index([*sorted(self._variables)])
+                data_existing = pd.DataFrame().reindex(columns=data_columns)
 
             if self._config.include:
-                rows = len(xlsx)
+                rows = len(data_existing)
                 rows_expected = max(self._config.include) + 1
                 if rows_expected - rows > 0:
-                    rows_extra = pd.DataFrame(np.nan, columns=xlsx.columns, index=range(rows, rows_expected))
-                    xlsx = pd.concat([xlsx, rows_extra])
+                    rows_extra = pd.DataFrame(np.nan, columns=data_existing.columns, index=range(rows, rows_expected))
+                    data_existing = pd.concat([data_existing, rows_extra])
 
-            return xlsx
-        return pd.DataFrame()
+            pd.DataFrame(data_existing).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
+            return data_existing
+        else:
+            return pd.DataFrame()
 
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
         mirror = kwargs.get('mirror', False)
         build_all = kwargs.get('build_all', False)
 
-        content = ['']
-        toggles = set()
-
-        tikz = r'\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
+        tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
         edges = [self._config.front]
         if mirror or 'back' in self._config:
             edges.append(self._config.back)
 
+        content = []
+        toggles = set()
         for row in range(len(data)) if build_all else self._config.include:
-            card = ['']
             for edge in edges:
+                edge_toggles = ['']
                 for key in self._variables:
                     item = data[key][row]
                     value = '' if pd.isna(item) else item
 
                     if re.search(r'\\if<\$' + key + r'\$>', edge):
                         toggles.add(key)
-                        card[0] += (r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}\n'
+                        edge_toggles.append((r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}')
 
                     edge = edge.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}')
                     edge = edge.replace(f'<${key}$>', value)
 
-                card.append(tikz + edge + '\n\\end{tikzcard}%\n')
-            content.extend(card)
+                content.append('\n'.join(edge_toggles) + tikz + edge + '\n\\end{tikzcard}%\n')
 
         content = '\n'.join(content)
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
@@ -120,11 +127,7 @@ class Tex:
 
         return tex
 
-    def _resample_images(self, tex: str, **kwargs):
-        quality = kwargs.get('quality') or self._config.quality
-        if quality == 100:
-            return
-
+    def _resample_images(self, tex: str, quality: int):
         begin_document = re.search(r'\\begin{document}', tex)
         assert begin_document, r'no \begin{document}?'
 
@@ -138,39 +141,38 @@ class Tex:
                 else:
                     graphics_dirs.append(Path(path))
 
-        self._cache_dir.mkdir(exist_ok=True, parents=True)
-        images: Set[Image] = set({Image(self._cache_dir, Path(r.group(1))) for r in re.finditer(r'\\includegraphics.*?{([^}]+)}', tex[begin_document.end():])})
+        self.cache_dir.mkdir(exist_ok=True, parents=True)
+        images: Set[Image] = set({Image(self.cache_dir, Path(r.group(1))) for r in re.finditer(r'\\includegraphics.*?{([^}]+)}', tex[begin_document.end():])})
         for img in images:
             for graphics_dir in graphics_dirs:
                 img.resample(graphics_dir, quality)
             if not img.resampled:
-                raise FileNotFoundError(img.path.as_posix())
+                raise FileNotFoundError(f'Could not find {img.path.as_posix()}')
 
     def build(self, **kwargs):
-        data = self._load_xslx()
+        data = self.generate()
         tex = self._prepare_tex(data, **kwargs)
-        self._resample_images(tex, **kwargs)
+        quality = kwargs.get('quality') or self._config.quality
+        if quality < 100:
+            self._resample_images(tex, quality)
+        else:
+            tex = tex.replace(r'%\graphicspath{{}}', r'\graphicspath{{' + self._path.parent.resolve().as_posix() + '}}')
 
-        with open(tex_generated := self._cache_dir / self._path.name, 'w') as f:
+        with open(tex_generated := self.cache_dir / self._path.name, 'w') as f:
             f.write(tex)
         with open(self._path.with_suffix('.cardlatex.tex'), 'w') as f:
             f.write(tex)
-
-        def delete_auxiliary(suffix: str):
-            aux = tex_generated.with_suffix(suffix)
-            if aux.exists():
-                os.remove(aux)
 
         cmd = f'xelatex.exe -interaction=nonstopmode "{tex_generated.stem}".tex'
         try:
             result = subprocess.run(cmd, cwd=tex_generated.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             if result.returncode != 0:
-                raise subprocess.SubprocessError(f'xelatex failed for {tex_generated.name}')
+                raise subprocess.SubprocessError(f'xelatex failed for {tex_generated.resolve()}')
         except subprocess.SubprocessError as e:
-            shutil.move(tex_generated.with_suffix('.log'), self._path.with_suffix('.log'))
             raise e
         else:
-            delete_auxiliary('.log')
+            shutil.copy(tex_generated.with_suffix('.log'), self._path.with_suffix('.log'))
             shutil.move(tex_generated.with_suffix('.pdf'), self._path.with_suffix('.pdf'))
         finally:
-            delete_auxiliary('.aux')
+            if (aux := tex_generated.with_suffix('.aux')).exists():
+                os.remove(aux)

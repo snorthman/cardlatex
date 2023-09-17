@@ -44,7 +44,9 @@ class Image:
 
         with WandImage(filename=graphics_path.resolve().as_posix()) as source:
             with source.convert(graphics_path.suffix[1:]) as target:
-                target.transform(resize=f'{quality}%')
+                if quality < 100:
+                    target.transform(resize=f'{quality}%')
+                self._cache_path.parent.mkdir(parents=True, exist_ok=True)
                 target.save(filename=self._cache_path)
 
         with open(self._cache_info, 'w') as f:

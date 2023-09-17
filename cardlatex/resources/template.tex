@@ -19,6 +19,8 @@
 \usetikzlibrary{arrows.meta,math,calc,scopes,fadings,backgrounds}
 %\usepgflibrary{fpu}
 
+%\graphicspath{{}}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TIKZ
 
@@ -37,14 +39,7 @@
 
 \def\bleed{<$bleed$>}
 \def\spacing{<$spacing$>}
-
-\newenvironment{tikzcard}[3][0]{
-\tikzmath{
-	coordinate \card;
-	\card = (#2-\bleed,#3-\bleed);
-}
-
-\begin{tikzpicture}
+\def\setcoords{
 	\coordinate (TL) at (0,0);
 	\coordinate (TR) at (\cardx,0);
 	\coordinate (BR) at (\cardx,-\cardy);
@@ -54,7 +49,16 @@
 	\coordinate (B) at (\cardx/2,-\cardy);
 	\coordinate (L) at (0,-\cardy/2);
 	\coordinate (C) at (\cardx/2,-\cardy/2);
+}
 
+\newenvironment{tikzcard}[3][0]{
+\tikzmath{
+	coordinate \card;
+	\card = (#2-\bleed,#3-\bleed);
+}
+
+\begin{tikzpicture}
+	\setcoords
 	\pgfmathparse{#1}
 	\ifdimequal{\pgfmathresult pt}{0pt}{}{
 		\pgfkeys{/pgf/fpu,/pgf/fpu/output format=fixed}
@@ -67,6 +71,7 @@
 		\pgfkeys{/pgf/fpu=false}
 	}
 }{
+	\setcoords
 	\begin{pgfonlayer}{print}
 		\draw[fill=black] 	  ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
 		\ifdimgreater{\spacing}{0cm}{

@@ -19,6 +19,8 @@
 \usetikzlibrary{arrows.meta,math,calc,scopes,fadings,backgrounds}
 %\usepgflibrary{fpu}
 
+%\graphicspath{{}}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TIKZ
 
@@ -37,14 +39,7 @@
 
 \def\bleed{0.3cm}
 \def\spacing{0cm}
-
-\newenvironment{tikzcard}[3][0]{
-\tikzmath{
-	coordinate \card;
-	\card = (#2-\bleed,#3-\bleed);
-}
-
-\begin{tikzpicture}
+\def\setcoords{
 	\coordinate (TL) at (0,0);
 	\coordinate (TR) at (\cardx,0);
 	\coordinate (BR) at (\cardx,-\cardy);
@@ -54,7 +49,16 @@
 	\coordinate (B) at (\cardx/2,-\cardy);
 	\coordinate (L) at (0,-\cardy/2);
 	\coordinate (C) at (\cardx/2,-\cardy/2);
+}
 
+\newenvironment{tikzcard}[3][0]{
+\tikzmath{
+	coordinate \card;
+	\card = (#2-\bleed,#3-\bleed);
+}
+
+\begin{tikzpicture}
+	\setcoords
 	\pgfmathparse{#1}
 	\ifdimequal{\pgfmathresult pt}{0pt}{}{
 		\pgfkeys{/pgf/fpu,/pgf/fpu/output format=fixed}
@@ -67,6 +71,7 @@
 		\pgfkeys{/pgf/fpu=false}
 	}
 }{
+	\setcoords
 	\begin{pgfonlayer}{print}
 		\draw[fill=black] 	  ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
 		\ifdimgreater{\spacing}{0cm}{
@@ -92,7 +97,7 @@
 \cardlatex[height]{3cm}
 \cardlatex[bleed]{0.3cm}
 \cardlatex[quality]{50}
-\cardlatex[include]{0}
+\cardlatex[include]{0...1,3}
 \cardlatex[front]{
     \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
     \if<$title$>{
@@ -111,12 +116,33 @@
 \begin{document}
 
 	\toggletrue{title}
-	
 	\begin{tikzcard}[0]{2cm}{3cm}%
 	
 	    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
 	    \ifvar{title}{
-	        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hello2}};
+	        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hello}};
+	    }{}
+	
+	\end{tikzcard}%
+	
+	
+	\togglefalse{title}
+	\begin{tikzcard}[0]{2cm}{3cm}%
+	
+	    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
+	    \ifvar{title}{
+	        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{}};
+	    }{}
+	
+	\end{tikzcard}%
+	
+	
+	\togglefalse{title}
+	\begin{tikzcard}[0]{2cm}{3cm}%
+	
+	    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
+	    \ifvar{title}{
+	        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{}};
 	    }{}
 	
 	\end{tikzcard}%
