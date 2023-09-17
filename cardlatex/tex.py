@@ -26,30 +26,46 @@ def sha256(encode: str) -> str:
 
 
 class Tex:
-    def __init__(self, tex: Path):
-        self._path = tex
+    def __init__(self, tex: Path | str):
+        self._path = Path(tex)
         self._path_xlsx = self._path.with_suffix('.xlsx')
         self._template = self.template()
 
-        # with open(tex.parent / tex.with_suffix('.xml')) as f:
-        #     self._xml = f.read()
-        with open(tex, 'r') as f:
+        with open(self._path, 'r') as f:
             self._tex = f.read()
 
         self._config = Config(self._tex)
         self._variables = frozenset({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})
-        self._cache_dir = Path(tempfile.gettempdir()) / 'cardlatex' / sha256(self._path.resolve().as_posix())
+        self._cache_dir = self.get_cache_dir(self._path)
+        self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
+        self._completed = False
 
     @staticmethod
     def template() -> str:
         with importlib.resources.open_text('cardlatex.resources', 'template.tex') as f:
             return f.read()
 
+    @staticmethod
+    def get_cache_dir(tex: Path | str):
+        return Path(tempfile.gettempdir()) / 'cardlatex' / sha256(Path(tex).resolve().as_posix())
+
     @property
     def cache_dir(self) -> Path:
         return self._cache_dir
 
-    def generate(self):
+    @property
+    def has_back(self) -> bool:
+        return 'back' in self._config
+
+    @property
+    def output(self) -> Path:
+        return self._cache_output_pdf
+
+    @property
+    def completed(self) -> bool:
+        return self._completed
+
+    def _load_or_generate_xlsx(self):
         if self._variables:
             if self._path_xlsx.exists():
                 try:
@@ -70,7 +86,11 @@ class Tex:
                     rows_extra = pd.DataFrame(np.nan, columns=data_existing.columns, index=range(rows, rows_expected))
                     data_existing = pd.concat([data_existing, rows_extra])
 
-            pd.DataFrame(data_existing).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
+            try:
+                pd.DataFrame(data_existing).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
+            except PermissionError:
+                pass
+
             return data_existing
         else:
             return pd.DataFrame()
@@ -81,7 +101,7 @@ class Tex:
 
         tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
         edges = [self._config.front]
-        if mirror or 'back' in self._config:
+        if mirror or self.has_back:
             edges.append(self._config.back)
 
         content = []
@@ -141,7 +161,6 @@ class Tex:
                 else:
                     graphics_dirs.append(Path(path))
 
-        self.cache_dir.mkdir(exist_ok=True, parents=True)
         images: Set[Image] = set({Image(self.cache_dir, Path(r.group(1))) for r in re.finditer(r'\\includegraphics.*?{([^}]+)}', tex[begin_document.end():])})
         for img in images:
             for graphics_dir in graphics_dirs:
@@ -149,8 +168,13 @@ class Tex:
             if not img.resampled:
                 raise FileNotFoundError(f'Could not find {img.path.as_posix()}')
 
-    def build(self, **kwargs):
-        data = self.generate()
+    def build(self, **kwargs) -> 'Tex':
+        if self.completed:
+            return self
+
+        self.cache_dir.mkdir(exist_ok=True, parents=True)
+
+        data = self._load_or_generate_xlsx()
         tex = self._prepare_tex(data, **kwargs)
         quality = kwargs.get('quality') or self._config.quality
         if quality < 100:
@@ -158,21 +182,32 @@ class Tex:
         else:
             tex = tex.replace(r'%\graphicspath{{}}', r'\graphicspath{{' + self._path.parent.resolve().as_posix() + '}}')
 
-        with open(tex_generated := self.cache_dir / self._path.name, 'w') as f:
+        with open(tex_out := self.cache_dir / self._path.name, 'w') as f:
             f.write(tex)
         with open(self._path.with_suffix('.cardlatex.tex'), 'w') as f:
             f.write(tex)
 
-        cmd = f'xelatex.exe -interaction=nonstopmode "{tex_generated.stem}".tex'
+        cmd = f'xelatex.exe -interaction=nonstopmode "{tex_out.stem}".tex'
         try:
-            result = subprocess.run(cmd, cwd=tex_generated.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            result = subprocess.run(cmd, cwd=tex_out.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
             if result.returncode != 0:
-                raise subprocess.SubprocessError(f'xelatex failed for {tex_generated.resolve()}')
+                raise subprocess.SubprocessError(f'xelatex.exe failed for {tex_out.resolve()}, see .log file')
         except subprocess.SubprocessError as e:
+            shutil.copy(tex_out.with_suffix('.log'), self._path.with_suffix('.log'))
             raise e
         else:
-            shutil.copy(tex_generated.with_suffix('.log'), self._path.with_suffix('.log'))
-            shutil.move(tex_generated.with_suffix('.pdf'), self._path.with_suffix('.pdf'))
+            self._completed = True
         finally:
-            if (aux := tex_generated.with_suffix('.aux')).exists():
+            if (aux := tex_out.with_suffix('.aux')).exists():
                 os.remove(aux)
+        return self
+
+    def release(self):
+        if self.completed:
+            output = self.cache_dir / self._path.name
+            log, pdf = output.with_suffix('.log'), output.with_suffix('.pdf')
+
+            if log.exists():
+                shutil.copy(output.with_suffix('.log'), self._path.with_suffix('.log'))
+            if pdf.exists():
+                shutil.move(output.with_suffix('.pdf'), self._path.with_suffix('.pdf'))

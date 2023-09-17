@@ -12,24 +12,25 @@ from cardlatex.__main__ import build
 from cardlatex.tex import Tex
 
 
-@pytest.fixture(params=[
-    ('default', 'default', None)
-])
-def args(request):
-    tex_file, xlsx_file, expected_error = request.param
-    return tex_file, xlsx_file, expected_error
+args_build = [['all'], ['mirror'], ['combine'], ['print'], ['quality', '25']]
 
 
-args_build = [['all'], ['mirror'], ['combine'], ['quality', '1'], ['quality', '100']]
-
-
-@pytest.fixture(params=chain(*[combinations(args_build, n) for n in range(len(args_build))]))
+@pytest.fixture(params=chain(*[combinations(args_build, n) for n in range(len(args_build) + 1)]))
 def kwargs_build(request):
     return {args[0]: args[1] if len(args) == 2 else None for args in request.param}
 
 
-@pytest.fixture
-def output(request, args: Tuple[str, str, Exception]):
+@pytest.fixture(params=[
+    ('default', 'default', None),
+    ('back', 'default', None),
+    (['back', 'combine'], 'default', None),
+    ('default', 'invalid_sheet', ValueError)
+])
+def output(request):
+    tex_files, xlsx_file, expected_error = request.param
+    if isinstance(tex_files, str):
+        tex_files = [tex_files]
+
     root = Path('./tests/')
     root_input = root / 'input'
     root_output = root / 'output'
@@ -40,20 +41,20 @@ def output(request, args: Tuple[str, str, Exception]):
 
     shutil.copytree(root_input / 'art', root_output / 'art', copy_function=shutil.copy)
 
-    tex_file, xlsx_file, expected_error = args
+    tex_paths = []
+    for i, tex_file in enumerate(tex_files):
+        if xlsx_file:
+            shutil.copy(root_input / f'{xlsx_file}.xlsx', root_output / f'test_{i}.xlsx')
+        shutil.copy(root_input / f'{tex_file}.tex', tex := root_output / f'test_{i}.tex')
+        tex_paths.append(tex.as_posix())
+        cache_dir = Tex.get_cache_dir(tex_file)
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
 
-    shutil.copy(root_input / f'{tex_file}.tex', tex := root_output / 'test.tex')
-    if xlsx_file:
-        shutil.copy(root_input / f'{xlsx_file}.xlsx', root_output / 'test.xlsx')
-
-    cache_dir = Tex(tex).cache_dir
-    if cache_dir.exists():
-        shutil.rmtree(cache_dir)
-
-    return tex_file, xlsx_file, tex.as_posix()
+    return tex_paths, xlsx_file, expected_error
 
 
-def run(func: Callable | BaseCommand, *args, **kwargs):
+def run(func: Callable | BaseCommand, expected_exception: Exception | None, *args, **kwargs):
     arguments = list(args)
     for key, value in kwargs.items():
         arguments.append(f'--{key}')
@@ -63,18 +64,19 @@ def run(func: Callable | BaseCommand, *args, **kwargs):
     runner = CliRunner()
     result = runner.invoke(func, arguments)
     if result.exit_code != 0:
-        raise result.exc_info[0](''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception)))
+        exception = result.exc_info[0]
+        if exception != expected_exception:
+            raise exception(''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception)))
 
 
-def test_build(output: Tuple[str, str, str], kwargs_build: dict):
-    tex_file, xlsx_file, out_file = output
-    run(build, out_file, **kwargs_build)
-    # run again, timeit and see if its faster (to confirm caching works?)
+def test_build(output: Tuple[list[str], str, Exception], kwargs_build: dict):
+    tex_files, _, expected_exception = output
+    run(build, expected_exception,*tex_files, **kwargs_build)
 
 
-def test_build_specific(output: Tuple[str, str, str], kwargs_build: dict):
-    tex_file, xlsx_file, out_file = output
-    if tex_file == 'default' and kwargs_build == {'quality': '1'}:
-        run(build, out_file, **kwargs_build)
+def test_build_specific(output: Tuple[list[str], str, Exception], kwargs_build: dict):
+    tex_files, xlsx_file, expected_exception = output
+    if len(tex_files) > 1 and xlsx_file == 'default' and kwargs_build == {'combine': None, 'mirror': None}:
+        run(build, expected_exception, *tex_files, **kwargs_build)
     else:
         pytest.skip()

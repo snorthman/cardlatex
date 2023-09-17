@@ -16,7 +16,8 @@ if __name__ == '__main__':
             'click',
             'openpyxl',
             'pandas',
-            'wand'
+            'wand',
+            'pikepdf'
         ],
         extras_require={
             'dev': [
