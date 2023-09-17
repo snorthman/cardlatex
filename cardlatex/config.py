@@ -14,6 +14,10 @@ class Config:
         matches: List[re.Match] = list(re.finditer(r'\\cardlatex\[(\w+)]\{', tex))
 
         for m, match in enumerate(matches):
+            e = match.end()
+            if tex[tex[:e].rfind('\n'):e].find('%'):
+                continue
+
             assert hasattr(Config, prop := match.group(1)), (
                 KeyError(rf'unknown {cardlatexprop(prop)}'))
             assert prop not in props, (

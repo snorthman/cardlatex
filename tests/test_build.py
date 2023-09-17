@@ -76,7 +76,7 @@ def test_build(output: Tuple[list[str], str, Exception], kwargs_build: dict):
 
 def test_build_specific(output: Tuple[list[str], str, Exception], kwargs_build: dict):
     tex_files, xlsx_file, expected_exception = output
-    if len(tex_files) > 1 and xlsx_file == 'default' and kwargs_build == {'combine': None, 'mirror': None}:
+    if len(tex_files) > 1 and xlsx_file == 'default' and kwargs_build == {'combine': None, 'print': None}:
         run(build, expected_exception, *tex_files, **kwargs_build)
     else:
         pytest.skip()
