@@ -1,5 +1,6 @@
 import shutil
 import traceback
+import os
 from itertools import combinations, chain
 from pathlib import Path
 from typing import Callable, Tuple
@@ -40,6 +41,8 @@ def output(request):
     root_output.mkdir()
 
     shutil.copytree(root_input / 'art', root_output / 'art', copy_function=shutil.copy)
+    shutil.copy(root_input / 'copyme.tex', root_output / 'copyme.tex')
+    shutil.copy(root_input / 'copymenot.tex', root_output / 'copymenot.tex')
 
     tex_paths = []
     for i, tex_file in enumerate(tex_files):
@@ -47,7 +50,7 @@ def output(request):
             shutil.copy(root_input / f'{xlsx_file}.xlsx', root_output / f'test_{i}.xlsx')
         shutil.copy(root_input / f'{tex_file}.tex', tex := root_output / f'test_{i}.tex')
         tex_paths.append(tex.as_posix())
-        cache_dir = Tex.get_cache_dir(tex_file)
+        cache_dir = Tex.get_cache_dir(tex)
         if cache_dir.exists():
             shutil.rmtree(cache_dir)
 
@@ -72,6 +75,31 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
 def test_build(output: Tuple[list[str], str, Exception], kwargs_build: dict):
     tex_files, _, expected_exception = output
     run(build, expected_exception,*tex_files, **kwargs_build)
+
+
+def test_cache(output: Tuple[list[str], str, Exception]):
+    tex_files, _, expected_exception = output
+    if expected_exception:
+        pytest.skip()
+
+    run(build, expected_exception,*tex_files)
+
+    stats = {}
+    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files]:
+        for directory, _, filenames in os.walk(cache):
+            for fn in filenames:
+                file = Path(directory) / fn
+                if file.suffix:
+                    stats[file] = file.stat().st_mtime_ns
+
+    run(build, expected_exception, *tex_files)
+
+    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files]:
+        for directory, _, filenames in os.walk(cache):
+            for fn in filenames:
+                file = Path(directory) / fn
+                if file.suffix:
+                    assert file.stat().st_mtime_ns == stats[file]
 
 
 def test_build_specific(output: Tuple[list[str], str, Exception], kwargs_build: dict):

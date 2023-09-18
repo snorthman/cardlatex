@@ -11,14 +11,12 @@ class Config:
         self._config = dict()
 
         props = set()
-        matches: List[re.Match] = list(re.finditer(r'\\cardlatex\[(\w+)]\{', tex))
-
+        matches: List[re.Match] = list(re.finditer(r'^(.*)\\cardlatex\[(\w+)]\{', tex, re.M))
         for m, match in enumerate(matches):
-            e = match.end()
-            if tex[tex[:e].rfind('\n'):e].find('%') >= 0:
+            if '%' in match.group(1):
                 continue
 
-            assert hasattr(Config, prop := match.group(1)), (
+            assert hasattr(Config, prop := match.group(2)), (
                 KeyError(rf'unknown {cardlatexprop(prop)}'))
             assert prop not in props, (
                 KeyError(rf'duplicate {cardlatexprop(prop)}'))

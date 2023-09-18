@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Set
+from typing import Set, List
 
 import numpy as np
 import pandas as pd
@@ -28,14 +28,13 @@ def sha256(encode: str) -> str:
 class Tex:
     def __init__(self, tex: Path | str):
         self._path = Path(tex)
-        self._path_xlsx = self._path.with_suffix('.xlsx')
         self._template = self.template()
 
         with open(self._path, 'r') as f:
             self._tex = f.read()
 
         self._config = Config(self._tex)
-        self._variables = frozenset({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})
+        self._variables = sorted(list(({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})))
         self._cache_dir = self.get_cache_dir(self._path)
         self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
         self._completed = False
@@ -67,13 +66,14 @@ class Tex:
 
     def _load_or_generate_xlsx(self):
         if self._variables:
-            if self._path_xlsx.exists():
+            path_xlsx = self._path.with_suffix('.xlsx')
+            if path_xlsx.exists():
                 try:
-                    data_existing = pd.read_excel(self._path_xlsx, sheet_name='cardlatex')
+                    data_existing = pd.read_excel(path_xlsx, sheet_name='cardlatex')
                 except ValueError as e:
                     raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
 
-                data_columns = pd.Index([*sorted(self._variables)] + [c for c in sorted(data_existing) if c not in self._variables])
+                data_columns = pd.Index([*data_existing.columns] + [c for c in self._variables if c not in data_existing])
                 data_existing = data_existing.reindex(columns=data_columns)
             else:
                 data_columns = pd.Index([*sorted(self._variables)])
@@ -87,7 +87,7 @@ class Tex:
                     data_existing = pd.concat([data_existing, rows_extra])
 
             try:
-                pd.DataFrame(data_existing).to_excel(self._path_xlsx, index=False, sheet_name='cardlatex')
+                pd.DataFrame(data_existing).to_excel(path_xlsx, index=False, sheet_name='cardlatex')
             except PermissionError:
                 pass
 
@@ -168,6 +168,17 @@ class Tex:
             if not img.resampled:
                 raise FileNotFoundError(f'Could not find {img.path.as_posix()}')
 
+    def _copy_inputs(self, tex: str):
+        matches: List[re.Match] = list(re.finditer(r'^(.*)\\input\{(\w+)}', tex, re.M))
+        for match in matches:
+            if '%' in match.group(1):
+                continue
+
+            name = match.group(2) + '.tex'
+            path = self._path.parent / name
+            if path.exists():
+                shutil.copy(path, self.cache_dir / name)
+
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
             return self
@@ -182,9 +193,8 @@ class Tex:
         else:
             tex = tex.replace(r'%\graphicspath{{}}', r'\graphicspath{{' + self._path.parent.resolve().as_posix() + '}}')
 
+        self._copy_inputs(tex)
         with open(tex_out := self.cache_dir / self._path.name, 'w') as f:
-            f.write(tex)
-        with open(self._path.with_suffix('.cardlatex.tex'), 'w') as f:
             f.write(tex)
 
         cmd = f'xelatex.exe -interaction=nonstopmode "{tex_out.stem}".tex'
@@ -207,6 +217,7 @@ class Tex:
             output = self.cache_dir / self._path.name
             log, pdf = output.with_suffix('.log'), output.with_suffix('.pdf')
 
+            shutil.copy(output.with_suffix('.tex'), self._path.with_suffix('.cardlatex.tex'))
             if log.exists():
                 shutil.copy(output.with_suffix('.log'), self._path.with_suffix('.log'))
             if pdf.exists():

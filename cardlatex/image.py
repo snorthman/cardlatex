@@ -1,4 +1,6 @@
 import os
+import re
+from typing import Set
 from pathlib import Path
 
 from wand.image import Image as WandImage
@@ -41,6 +43,7 @@ class Image:
                 cache_quality = int(f.read())
             if equal_stat and cache_quality == quality:
                 self._resampled = True
+                return
 
         with WandImage(filename=graphics_path.resolve().as_posix()) as source:
             with source.convert(graphics_path.suffix[1:]) as target:
