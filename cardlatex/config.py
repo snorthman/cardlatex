@@ -110,12 +110,13 @@ class Config:
         include = []
         for v in values:
             if r := re.match(r'(\d+)\.{2,3}(\d+)', v):
-                left, right = int(r.group(1)), int(r.group(2))
+                left, right = int(r.group(1)) - 1, int(r.group(2)) - 1
                 assert left <= right, ValueError(
                     rf'{left} is larger than {right} in {v} for {cardlatexprop("include")}')
                 include.extend(range(left, right + 1))
             else:
-                include.append(int(v))
+                include.append(int(v) - 1)
+        assert all([i > 0 for i in include]), ValueError(f'Not all pages included are above 0 for {cardlatexprop("include")}')
         self._config['include'] = include
 
     @property

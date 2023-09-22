@@ -25,7 +25,8 @@ def kwargs_build(request):
     ('default', 'default', None),
     ('back', 'default', None),
     (['back', 'combine'], 'default', None),
-    ('default', 'invalid_sheet', ValueError)
+    ('default', 'invalid', ValueError),
+    ('default', 'incomplete', FileNotFoundError)
 ])
 def output(request):
     tex_files, xlsx_file, expected_error = request.param
@@ -68,8 +69,7 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
     result = runner.invoke(func, arguments)
     if result.exit_code != 0:
         exception = result.exc_info[0]
-        if exception != expected_exception:
-            raise exception(''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception)))
+        assert exception == expected_exception, ''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception))
 
 
 def test_build(output: Tuple[list[str], str, Exception], kwargs_build: dict):
@@ -104,7 +104,7 @@ def test_cache(output: Tuple[list[str], str, Exception]):
 
 def test_build_specific(output: Tuple[list[str], str, Exception]):
     tex_files, xlsx_file, expected_exception = output
-    if len(tex_files) > 1 and xlsx_file == 'default':
-        run(build, expected_exception, *tex_files, {'combine': None, 'print': None})
+    if xlsx_file == 'incomplete':
+        run(build, expected_exception, *tex_files, **{'combine': None, 'print': None})
     else:
         pytest.skip()
