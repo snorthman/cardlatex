@@ -102,9 +102,9 @@ def test_cache(output: Tuple[list[str], str, Exception]):
                     assert file.stat().st_mtime_ns == stats[file]
 
 
-def test_build_specific(output: Tuple[list[str], str, Exception], kwargs_build: dict):
+def test_build_specific(output: Tuple[list[str], str, Exception]):
     tex_files, xlsx_file, expected_exception = output
-    if len(tex_files) > 1 and xlsx_file == 'default' and kwargs_build == {'combine': None, 'print': None}:
-        run(build, expected_exception, *tex_files, **kwargs_build)
+    if len(tex_files) > 1 and xlsx_file == 'default':
+        run(build, expected_exception, *tex_files, {'combine': None, 'print': None})
     else:
         pytest.skip()

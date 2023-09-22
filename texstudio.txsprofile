@@ -1,3 +1,0 @@
-[texmaker]
-Tools\Commands\quick=txs:///user0 | txs:///view
-Tools\Commands\user0=cmd /C \"cardlatex build %.tex\"
