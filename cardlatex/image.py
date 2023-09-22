@@ -1,6 +1,4 @@
 import os
-import re
-from typing import Set
 from pathlib import Path
 
 from wand.image import Image as WandImage

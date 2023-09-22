@@ -5,12 +5,12 @@ version = '0.3.0'
 if __name__ == '__main__':
     setup(
         name='cardlatex',
-        version='',
+        version=version,
         packages=['cardlatex'],
         url='',
         license='',
-        author='snorthman',
-        author_email='',
+        author='Stan Noordman',
+        author_email='snorthman1@gmail.com',
         description='',
         install_requires=[
             'click',
@@ -23,6 +23,7 @@ if __name__ == '__main__':
             'dev': [
                 'pytest',
                 'coverage',
+                'flake8'
             ]
         },
         entry_points={

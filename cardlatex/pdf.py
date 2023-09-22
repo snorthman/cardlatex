@@ -43,7 +43,7 @@ def combine_pdf(*files: Path) -> Path:
 
 def grid_pdf(file: Path, has_back: bool = False):
     if not file.exists():
-        raise FileNotFoundError(f'input pdf not found: ' + str(file))
+        raise FileNotFoundError(f'input pdf not found: {file}')
 
     pdf = Pdf.open(file)
     pages: List[Page] = list(pdf.pages)
@@ -69,11 +69,11 @@ def grid_pdf(file: Path, has_back: bool = False):
     front, back = [[]], [[]]
     sheets = []
     for pp in range(len(pages)):
-        l = back if pp % 2 == 1 and has_back else front
-        if len(l[-1]) >= grid:
-            sheets.append(l[-1])
-            l.append([])
-        l[-1].append(pp)
+        item = back if pp % 2 == 1 and has_back else front
+        if len(item[-1]) >= grid:
+            sheets.append(item[-1])
+            item.append([])
+        item[-1].append(pp)
         pp += 1
     sheets.extend([f_b for f_b in [front[-1], back[-1]] if f_b])
 

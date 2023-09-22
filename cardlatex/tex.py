@@ -1,10 +1,9 @@
 import hashlib
 import importlib.resources
-import re
 import os
+import re
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Set, List
 

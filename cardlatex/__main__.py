@@ -1,12 +1,13 @@
-import sys, logging, traceback
+import logging
+import sys
 from pathlib import Path
 from typing import Tuple
 
 import click
 
 from . import version, tempdir
-from .tex import Tex
 from .pdf import grid_pdf, combine_pdf
+from .tex import Tex
 
 
 @click.command()
