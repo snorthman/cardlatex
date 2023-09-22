@@ -15,10 +15,6 @@ from .config import Config
 from .image import Image
 
 
-def cardlatexprop(prop: str = ''):
-    return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
-
-
 def sha256(encode: str) -> str:
     obj = hashlib.sha1()
     obj.update(encode.encode('utf-8'))

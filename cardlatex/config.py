@@ -37,6 +37,7 @@ class Config:
                     ValueError(rf'{cardlatexprop()} found inside {cardlatexprop(prop)}'))
 
             setattr(self, prop, tex[match.end():endpos])
+        pass  # mark properties as required, error message if missing from .tex here
 
     def _set_length_prop(self, prop: str, value: str):
         value = str(value).strip()
@@ -116,7 +117,9 @@ class Config:
                 include.extend(range(left, right + 1))
             else:
                 include.append(int(v) - 1)
-        assert all([i > 0 for i in include]), ValueError(f'Not all pages included are above 0 for {cardlatexprop("include")}')
+        for i in include:
+            if i < 0:
+                raise ValueError(f'Including page {i + 1} is invalid for {cardlatexprop("include")}')
         self._config['include'] = include
 
     @property

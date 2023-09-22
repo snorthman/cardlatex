@@ -22,17 +22,23 @@ def kwargs_build(request):
 
 
 @pytest.fixture(params=[
-    ('default', 'default', None),
-    ('back', 'default', None),
-    (['back', 'combine'], 'default', None),
-    ('default', 'invalid', ValueError),
-    ('default', 'incomplete', FileNotFoundError)
+    (['default'], 'default'),
+    (['back'], 'default'),
+    (['back', 'combine'], 'default')
 ])
-def output(request):
-    tex_files, xlsx_file, expected_error = request.param
-    if isinstance(tex_files, str):
-        tex_files = [tex_files]
+def args_build(request) -> tuple[list[str], str]:
+    return request.param
 
+
+@pytest.fixture(params=[
+    (['default'], 'invalid', ValueError),
+    (['default'], 'incomplete', FileNotFoundError)
+])
+def args_build_fail(request) -> tuple[list[str], str, Exception]:
+    return request.param
+
+
+def prepare(*tex_files, xlsx_name: str = 'default') -> list[str]:
     root = Path('./tests/')
     root_input = root / 'input'
     root_output = root / 'output'
@@ -47,15 +53,15 @@ def output(request):
 
     tex_paths = []
     for i, tex_file in enumerate(tex_files):
-        if xlsx_file:
-            shutil.copy(root_input / f'{xlsx_file}.xlsx', root_output / f'test_{i}.xlsx')
+        if xlsx_name:
+            shutil.copy(root_input / f'{xlsx_name}.xlsx', root_output / f'test_{i}.xlsx')
         shutil.copy(root_input / f'{tex_file}.tex', tex := root_output / f'test_{i}.tex')
         tex_paths.append(tex.as_posix())
         cache_dir = Tex.get_cache_dir(tex)
         if cache_dir.exists():
             shutil.rmtree(cache_dir)
 
-    return tex_paths, xlsx_file, expected_error
+    return tex_paths
 
 
 def run(func: Callable | BaseCommand, expected_exception: Exception | None, *args, **kwargs):
@@ -72,29 +78,34 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
         assert exception == expected_exception, ''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception))
 
 
-def test_build(output: Tuple[list[str], str, Exception], kwargs_build: dict):
-    tex_files, _, expected_exception = output
-    run(build, expected_exception,*tex_files, **kwargs_build)
+def test_build(args_build: tuple[str, str], kwargs_build: dict):
+    tex_files, xlsx_name = args_build
+    run(build, None, *prepare(*tex_files, xlsx_name), **kwargs_build)
+
+
+def test_build_expected_exception(args_build_fail: tuple[str, str, Exception]):
+    tex_files, xlsx_name, expected_exception = args_build_fail
+    run(build, expected_exception, *prepare(*tex_files, xlsx_name))
 
 
 def test_cache(output: Tuple[list[str], str, Exception]):
-    tex_files, _, expected_exception = output
+    tex_files, xlsx_name, expected_exception = output
     if expected_exception:
         pytest.skip()
 
-    run(build, expected_exception,*tex_files)
+    run(build, expected_exception, *(tex_files_prepared := prepare(*tex_files, xlsx_name)))
 
     stats = {}
-    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files]:
+    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
         for directory, _, filenames in os.walk(cache):
             for fn in filenames:
                 file = Path(directory) / fn
                 if file.suffix:
                     stats[file] = file.stat().st_mtime_ns
 
-    run(build, expected_exception, *tex_files)
+    run(build, expected_exception, *tex_files_prepared)
 
-    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files]:
+    for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
         for directory, _, filenames in os.walk(cache):
             for fn in filenames:
                 file = Path(directory) / fn
@@ -103,8 +114,8 @@ def test_cache(output: Tuple[list[str], str, Exception]):
 
 
 def test_build_specific(output: Tuple[list[str], str, Exception]):
-    tex_files, xlsx_file, expected_exception = output
-    if xlsx_file == 'incomplete':
-        run(build, expected_exception, *tex_files, **{'combine': None, 'print': None})
+    tex_files, xlsx_name, expected_exception = output
+    if xlsx_name == 'incomplete':
+        run(build, expected_exception, *prepare(*tex_files, xlsx_name), **{'combine': None, 'print': None})
     else:
         pytest.skip()
