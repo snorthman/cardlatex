@@ -34,6 +34,7 @@ class Tex:
         self._cache_dir = self.get_cache_dir(self._path)
         self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
         self._completed = False
+        self._mirror = False
 
     @staticmethod
     def template() -> str:
@@ -50,7 +51,7 @@ class Tex:
 
     @property
     def has_back(self) -> bool:
-        return 'back' in self._config
+        return 'back' in self._config or self._mirror
 
     @property
     def output(self) -> Path:
@@ -92,12 +93,12 @@ class Tex:
             return pd.DataFrame()
 
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
-        mirror = kwargs.get('mirror', False)
+        self._mirror = kwargs.get('mirror', False)
         build_all = kwargs.get('build_all', False)
 
         tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
         edges = [self._config.front]
-        if mirror or self.has_back:
+        if self.has_back:
             edges.append(self._config.back)
 
         content = []

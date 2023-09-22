@@ -1,17 +1,17 @@
+import os
 import shutil
 import traceback
-import os
 from itertools import combinations, chain
 from pathlib import Path
-from typing import Callable, Tuple
+from typing import Callable
 
 import pytest
 from click import BaseCommand
 from click.testing import CliRunner
+from pikepdf import Pdf, Page
 
 from cardlatex.__main__ import build
 from cardlatex.tex import Tex
-
 
 args_build_params = [['all'], ['mirror'], ['combine'], ['print'], ['quality', '25']]
 
@@ -72,6 +72,9 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
         if value:
             arguments.append(value)
 
+    if len(args) < 2 and 'combine' in kwargs:
+        pytest.skip()
+
     runner = CliRunner()
     result = runner.invoke(func, arguments)
     if result.exit_code != 0:
@@ -82,6 +85,38 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
 def test_build(args_build: tuple[str, str], kwargs_build: dict):
     tex_files, xlsx_name = args_build
     run(build, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
+    output_dir = Path('./tests/output')
+    outputs = [output_dir / 'test_0.pdf']
+
+    expected = -1
+    if len(tex_files) == 1:
+        if 'default' in tex_files:
+            expected = 3
+            if 'all' in kwargs_build:
+                expected = 4
+            if 'print' in kwargs_build:
+                expected = 1
+            if 'mirror' in kwargs_build:
+                expected *= 2
+        elif 'back' in tex_files:
+            expected = 8
+            if 'print' in kwargs_build:
+                expected = 2
+    elif len(tex_files):
+        outputs.append(output_dir / 'test_1.pdf')
+        expected = 12
+        if 'combine' in kwargs_build:
+            outputs.pop()
+        if 'mirror' in kwargs_build:
+            expected = 16
+        if 'print' in kwargs_build:
+            expected = 4 if 'mirror' in kwargs_build else 3
+
+    actual = 0
+    for output in outputs:
+        with Pdf.open(output) as pdf:
+            actual += len(pdf.pages)
+    assert actual == expected
 
 
 def test_build_expected_exception(args_build_fail: tuple[str, str, Exception]):

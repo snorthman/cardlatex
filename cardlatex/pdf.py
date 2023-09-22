@@ -1,11 +1,9 @@
-import re, subprocess, os, math
+import math
 from decimal import Decimal
 from pathlib import Path
 from typing import List
 
 from pikepdf import Pdf, Page, Rectangle
-
-from . import PaperEnum
 
 
 def unit_to_cm(unit: Decimal):
