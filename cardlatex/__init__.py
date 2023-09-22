@@ -1,7 +1,7 @@
+import tempfile, pathlib
+
 from cardlatex.__version__ import version
-from enum import Enum
 
 
-class PaperEnum(Enum):
-    ISO = "ISO"
-    US = "US"
+tempdir = pathlib.Path(tempfile.gettempdir()) / 'cardlatex'
+tempdir.mkdir(exist_ok=True, parents=True)

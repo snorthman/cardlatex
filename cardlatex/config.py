@@ -3,7 +3,7 @@ from typing import List
 
 
 def cardlatexprop(prop: str = ''):
-    return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
+    return rf'\cardlatex configuration object' + (f'" {prop}"' if prop else '')
 
 
 required_props = set()

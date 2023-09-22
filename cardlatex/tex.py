@@ -11,6 +11,7 @@ from typing import Set, List
 import numpy as np
 import pandas as pd
 
+from . import tempdir
 from .config import Config
 from .image import Image
 
@@ -43,7 +44,7 @@ class Tex:
 
     @staticmethod
     def get_cache_dir(tex: Path | str):
-        return Path(tempfile.gettempdir()) / 'cardlatex' / sha256(Path(tex).resolve().as_posix())
+        return tempdir / sha256(Path(tex).resolve().as_posix())
 
     @property
     def cache_dir(self) -> Path:
@@ -196,18 +197,15 @@ class Tex:
             f.write(tex)
 
         cmd = f'xelatex.exe -interaction=nonstopmode "{tex_out.stem}".tex'
-        try:
-            result = subprocess.run(cmd, cwd=tex_out.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-            if result.returncode != 0:
-                raise subprocess.SubprocessError(f'xelatex.exe failed for {tex_out.resolve()}, see .log file')
-        except subprocess.SubprocessError as e:
+        result = subprocess.run(cmd, cwd=tex_out.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if (aux := tex_out.with_suffix('.aux')).exists():
+            os.remove(aux)
+
+        if result.returncode != 0:
             shutil.copy(tex_out.with_suffix('.log'), self._path.with_suffix('.log'))
-            raise e
-        else:
-            self._completed = True
-        finally:
-            if (aux := tex_out.with_suffix('.aux')).exists():
-                os.remove(aux)
+            raise subprocess.SubprocessError(f'xelatex.exe failed for {tex_out.resolve()}, see .log file')
+
+        self._completed = True
         return self
 
     def release(self):

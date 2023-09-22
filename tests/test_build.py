@@ -76,10 +76,12 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
         pytest.skip()
 
     runner = CliRunner()
-    result = runner.invoke(func, arguments)
+    result = runner.invoke(func, arguments + ['--debug'])
     if result.exit_code != 0:
         exception = result.exc_info[0]
         assert exception == expected_exception, ''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception))
+    else:
+        assert expected_exception is None
 
 
 def test_build(args_build: tuple[str, str], kwargs_build: dict):
