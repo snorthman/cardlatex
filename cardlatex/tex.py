@@ -102,7 +102,7 @@ class Tex:
 
         content = []
         toggles = set()
-        for row in range(len(data)) if build_all else self._config.include:
+        for row in range(len(data)) if build_all or self._config.include is None else self._config.include:
             for edge in edges:
                 edge_toggles = ['']
                 for key in self._variables:
@@ -183,6 +183,7 @@ class Tex:
 
         data = self._load_or_generate_xlsx()
         tex = self._prepare_tex(data, **kwargs)
+
         quality = kwargs.get('quality') or self._config.quality
         if quality < 100:
             self._resample_images(tex, quality)

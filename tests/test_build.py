@@ -13,10 +13,10 @@ from cardlatex.__main__ import build
 from cardlatex.tex import Tex
 
 
-args_build = [['all'], ['mirror'], ['combine'], ['print'], ['quality', '25']]
+args_build_params = [['all'], ['mirror'], ['combine'], ['print'], ['quality', '25']]
 
 
-@pytest.fixture(params=chain(*[combinations(args_build, n) for n in range(len(args_build) + 1)]))
+@pytest.fixture(params=chain(*[combinations(args_build_params, n) for n in range(len(args_build_params) + 1)]))
 def kwargs_build(request):
     return {args[0]: args[1] if len(args) == 2 else None for args in request.param}
 
@@ -31,6 +31,7 @@ def args_build(request) -> tuple[list[str], str]:
 
 
 @pytest.fixture(params=[
+    (['missing'], 'default', ValueError),
     (['default'], 'invalid', ValueError),
     (['default'], 'incomplete', FileNotFoundError)
 ])
@@ -38,7 +39,7 @@ def args_build_fail(request) -> tuple[list[str], str, Exception]:
     return request.param
 
 
-def prepare(*tex_files, xlsx_name: str = 'default') -> list[str]:
+def prepare(xlsx_name: str, *tex_files) -> list[str]:
     root = Path('./tests/')
     root_input = root / 'input'
     root_output = root / 'output'
@@ -80,20 +81,18 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
 
 def test_build(args_build: tuple[str, str], kwargs_build: dict):
     tex_files, xlsx_name = args_build
-    run(build, None, *prepare(*tex_files, xlsx_name), **kwargs_build)
+    run(build, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
 
 
 def test_build_expected_exception(args_build_fail: tuple[str, str, Exception]):
     tex_files, xlsx_name, expected_exception = args_build_fail
-    run(build, expected_exception, *prepare(*tex_files, xlsx_name))
+    run(build, expected_exception, *prepare(xlsx_name, *tex_files))
 
 
-def test_cache(output: Tuple[list[str], str, Exception]):
-    tex_files, xlsx_name, expected_exception = output
-    if expected_exception:
-        pytest.skip()
+def test_cache(args_build: tuple[str, str]):
+    tex_files, xlsx_name = args_build
 
-    run(build, expected_exception, *(tex_files_prepared := prepare(*tex_files, xlsx_name)))
+    run(build, None, *(tex_files_prepared := prepare(xlsx_name, *tex_files)))
 
     stats = {}
     for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
@@ -103,7 +102,7 @@ def test_cache(output: Tuple[list[str], str, Exception]):
                 if file.suffix:
                     stats[file] = file.stat().st_mtime_ns
 
-    run(build, expected_exception, *tex_files_prepared)
+    run(build, None, *tex_files_prepared)
 
     for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
         for directory, _, filenames in os.walk(cache):
@@ -113,9 +112,5 @@ def test_cache(output: Tuple[list[str], str, Exception]):
                     assert file.stat().st_mtime_ns == stats[file]
 
 
-def test_build_specific(output: Tuple[list[str], str, Exception]):
-    tex_files, xlsx_name, expected_exception = output
-    if xlsx_name == 'incomplete':
-        run(build, expected_exception, *prepare(*tex_files, xlsx_name), **{'combine': None, 'print': None})
-    else:
-        pytest.skip()
+def test_build_specific():
+    run(build, None, *prepare('default', *['back']), **{})

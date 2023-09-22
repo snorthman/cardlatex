@@ -6,7 +6,16 @@ def cardlatexprop(prop: str = ''):
     return rf'\cardlatex configuration object' + (f'"{prop}"' if prop else '')
 
 
+required_props = set()
+
+
 class Config:
+
+    @staticmethod
+    def required(prop):
+        required_props.add(prop.__name__)
+        return prop
+
     def __init__(self, tex: str):
         self._config = dict()
 
@@ -37,7 +46,10 @@ class Config:
                     ValueError(rf'{cardlatexprop()} found inside {cardlatexprop(prop)}'))
 
             setattr(self, prop, tex[match.end():endpos])
-        pass  # mark properties as required, error message if missing from .tex here
+
+        for prop in required_props:
+            if prop not in self._config:
+                raise ValueError(cardlatexprop(prop) + ' missing')
 
     def _set_length_prop(self, prop: str, value: str):
         value = str(value).strip()
@@ -52,6 +64,7 @@ class Config:
         return item in self._config
 
     @property
+    @required
     def width(self) -> str:
         return self._config['width']
 
@@ -60,6 +73,7 @@ class Config:
         self._set_length_prop('width', value)
 
     @property
+    @required
     def height(self) -> str:
         return self._config['height']
 
@@ -123,6 +137,7 @@ class Config:
         self._config['include'] = include
 
     @property
+    @required
     def front(self) -> str:
         return self._config['front']
 
