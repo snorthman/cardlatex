@@ -14,8 +14,6 @@ from .tex import Tex
 @click.argument('tex', nargs=-1, type=click.Path(exists=True))
 @click.option('-a', '--all', 'build_all', is_flag=True,
               help=r'Override the \cardlatex[include] configuration to be undefined.')
-@click.option('-m', '--mirror', is_flag=True,
-              help=r'If \cardlatex[back] is undefined, it mirrors \cardlatex[front] instead.')
 @click.option('-c', '--combine', is_flag=True,
               help='Combine source tex files into a single PDF file.')
 @click.option('-p', '--print', 'paper', is_flag=True,  # type=click.Choice([p.value for p in PaperEnum]), default=None,
@@ -24,7 +22,7 @@ from .tex import Tex
               help=r'Override the \cardlatex[quality] configuration to QUALITY%.')
 @click.option('--debug', is_flag=True, hidden=True)
 @click.version_option(version)
-def build(tex: Tuple[Path, ...], build_all: bool, mirror: bool, combine: bool, paper: bool, quality: int, debug: bool):
+def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, quality: int, debug: bool):
     context = click.get_current_context()
 
     logger = logging.getLogger()

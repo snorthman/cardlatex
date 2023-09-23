@@ -1,56 +1,87 @@
 # cardlatex
 
-**cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` files. 
+**cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` and `.xlsx` files. Both `.tex` and `.xlsx` must share the same file name.
 
-XML files contain the card data. XML templates can be generated from the source tex files. 
-Both `.tex` and `.xml` must share the same file name.
+## Getting started
 
-## `.tex` Configuration
+### Prerequisites
 
-Configuration is defined in the `.tex` document. Example: `\cardlatex[bleed]{5mm}`. Defining the same variable more than once is an error.
+To get started with **cardlatex**, you'll need:
+
+* [MiKTeX](https://miktex.org/download)
+* [ImageMagick](https://imagemagick.org/script/download.php) (make sure to check `Install development headers and libraries for C and C++`)
+* [Python](https://www.python.org/downloads/)
+* [TeXstudio](https://www.texstudio.org/) (optional; if you do, import our helpful TeXstudio macro)
+
+After these prerequisites are installed, in a terminal:
+
+```commandline
+pip install cardlatex
+```
+
+#### **OR**
+
+If you are using Windows, you can simply install the Windows package manager [Chocolatey](https://chocolatey.org/install#individual), then:
+
+
+```commandline
+choco install cardlatex
+```
+
+### Example
+
+`card.tex`
+
+```latex
+\cardlatex[width]{2cm}
+\cardlatex[height]{3cm}
+\cardlatex[bleed]{0.3cm}
+\cardlatex[quality]{1}
+\cardlatex[include]{1...2,4}
+\cardlatex[front]{
+    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
+    \if<$title$>{
+        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
+    }{}
+}
+```
+
+## Documentation
+
+## `.tex` configurations
+
+Configurations are defined in the `.tex` document. Defining the same variable more than once is an error.
+
+**Do not use TeX macros or placeholder variables in any configuration other than `front` and `back`.**
 
 - `width (length)`: `required` Width of the card.
 - `height (length)`: `required` Height of the card.
 - `ppi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
-This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, 300)` (with no length hint) will be positioned at 300 pixels from the top left.
+This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, -300)` (with no length hint) will be positioned at 300 pixels from the top left.
 - `bleed (length)`: `default = 0` Bleed margin of the card.
 - `quality (number)`: `default = 100` Quality of `\includegraphics` images. Useful for testing. Must be between 1 and 100.
-- `include (numbers)`: Compile only specific rows. If left undefined, all rows in the XML are compiled.
-- `front (text)`: `required` Front template of the card.
-- `back (text)`: Back template of the card. If left undefined, the front template is used for the back of the card.
+- `include (numbers)`: Compile only specific rows. If left undefined, all rows in the XML are compiled. Accepts numbers `n > 0` and ranges `i...j`.
+- `front (text)`: `required` Front template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
+- `back (text)`: Back template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
 
-## `cardlatex build`
+## `.xlsx` data
 
-Compile `.tex`/`.xml` file pairs.
+Ensure the sheet name is `cardlatex`. 
+The top row is reserved for the variable names used in your `.tex` templates with `<$variable$>`. 
+Every subsequent row are the values of these placeholders. 
+These placeholders only work within the `\cardlatex[front]` and `\cardlatex[back]` configurations.
 
-`cardlatex build [<tex files>] [flags]`
+Our card is 2 by 3 cm with a 0.3cm bleed. Images are resampled to 1% of original, and 
 
-### Options
+## `cardlatex` command
+
+Compiles `.tex`/`.xml` file pairs in your terminal.
+
+`cardlatex [<tex files>] [flags]`
+
+### Flags
 
 - `-c, --combine`: Combine all output PDF files to one. Has no effect is compiling only one `.tex` file.
-- `-p, --print <paper>`: Grid each row to fit on `<paper>`. See below for allowed `<paper>` values.
+- `-p, --print`: Grid each row to fit on A4 or A3 paper. (in the future, other paper sizes will be included)
 - `-q, --quality <number>`: Override `\cardlatex[quality]` configuration to be set to `<number>`.
-- `-b, --bleed <length>`: Override `\cardlatex[bleed]` configuration to be set to `<length>`.
 - `-a, --all`: Override `\cardlatex[include]` configuration to be undefined.
-
-## `cardlatex xml`
-
-Generate a base `.xml` file for the given `.tex` file. If the `.xml` file(s) already exist, the 
-
-`cardlatex xml [<tex files>] [flags]`
-
-### Options
-
-- `-n, --only-new`: D
-
-
-## Arguments
-
-`.tex` files to compile. If multiple `.tex` files are used, a single `.pdf` file is provided which tries to optimally position all cards.
-
-## Options
-
-- `-x, --xml`: Generate a default XML file for each `.tex` file given as argument.
-- `-f, --full`: List all entries including those starting with a dot `.`.
-
-**cardlatexstudio** is a Qt6 application which can read and write .ctex files. These files contain settings and data necessary for **cardlatex** to generate a .tex file with.

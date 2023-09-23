@@ -13,7 +13,7 @@ from pikepdf import Pdf, Page
 from cardlatex.__main__ import build
 from cardlatex.tex import Tex
 
-args_build_params = [['all'], ['mirror'], ['combine'], ['print'], ['quality', '25']]
+args_build_params = [['all'], ['combine'], ['print'], ['quality', '25']]
 
 
 @pytest.fixture(params=chain(*[combinations(args_build_params, n) for n in range(len(args_build_params) + 1)]))
@@ -98,8 +98,6 @@ def test_build(args_build: tuple[str, str], kwargs_build: dict):
                 expected = 4
             if 'print' in kwargs_build:
                 expected = 1
-            if 'mirror' in kwargs_build:
-                expected *= 2
         elif 'back' in tex_files:
             expected = 8
             if 'print' in kwargs_build:
@@ -109,8 +107,6 @@ def test_build(args_build: tuple[str, str], kwargs_build: dict):
         expected = 12
         if 'combine' in kwargs_build:
             outputs.pop()
-        if 'mirror' in kwargs_build:
-            expected = 16
         if 'print' in kwargs_build:
             expected = 4 if 'mirror' in kwargs_build else 3
 

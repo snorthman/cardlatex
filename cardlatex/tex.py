@@ -34,7 +34,6 @@ class Tex:
         self._cache_dir = self.get_cache_dir(self._path)
         self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
         self._completed = False
-        self._mirror = False
 
     @staticmethod
     def template() -> str:
@@ -51,7 +50,7 @@ class Tex:
 
     @property
     def has_back(self) -> bool:
-        return 'back' in self._config or self._mirror
+        return 'back' in self._config
 
     @property
     def output(self) -> Path:
@@ -93,7 +92,6 @@ class Tex:
             return pd.DataFrame()
 
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
-        self._mirror = kwargs.get('mirror', False)
         build_all = kwargs.get('build_all', False)
 
         tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
@@ -201,8 +199,9 @@ class Tex:
             os.remove(aux)
 
         if result.returncode != 0:
-            shutil.copy(tex_out.with_suffix('.log'), self._path.with_suffix('.log'))
-            raise subprocess.SubprocessError(f'xelatex.exe failed for {tex_out.resolve()}, see .log file')
+            _path_log = self._path.with_suffix('.log')
+            shutil.copy(tex_out.with_suffix('.log'), _path_log)
+            raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {_path_log.resolve()}')
 
         self._completed = True
         return self
