@@ -51,6 +51,8 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, qu
         logging.exception(e)
         if debug:
             raise e
+        else:
+            exit(1)
 
 
 if __name__ == '__main__':

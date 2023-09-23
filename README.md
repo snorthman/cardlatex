@@ -25,10 +25,20 @@ If you are using Windows, you can simply install the Windows package manager [Ch
 
 
 ```commandline
-choco install cardlatex
+choco install miktex.install
+choco install imagemagick.app --params InstallDevelopmentHeaders=true
+choco install cardlatex --source python
+'optional'
+choco install texstudio.install
 ```
 
-### Example
+## Example
+
+```
+project/
+├── card.tex
+└── card.xlsx
+```
 
 `card.tex`
 
@@ -44,6 +54,35 @@ choco install cardlatex
         \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
     }{}
 }
+```
+
+Our card is 2 cm by 3 cm with a 0.3cm bleed. Images are resampled to 1% of original, and we are only interested in compiling
+rows 1, 2 and 4.
+
+`card.xlsx`
+
+| art        | title     |   
+|------------|-----------|
+| background | Yesterday | 
+| background | Today     |  
+| background | Tomorrow  | 
+| background | Future    |
+
+In directory in which these files exist, we run:
+
+```commandline
+cardlatex card.tex
+```
+
+This will output three new files:
+
+```
+project/
+├── card.tex
+├── card.xlsx
+├── card.cardlatex.tex (the .tex file that is actually compiled with xelatex.exe)
+├── card.pdf (the resulting .pdf file)
+└── card.log (the .log file, in case any errors occur)
 ```
 
 ## Documentation
@@ -64,6 +103,11 @@ This is helpful when defining pixel-perfect coordinate positioning, as a node at
 - `front (text)`: `required` Front template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
 - `back (text)`: Back template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
 
+Any additional TeX will be run as normal, but using the `\begin{document}` environment is an error.
+For example, you can write additional `\newcommand` macros for your template, or prepare TikZ with `\tikzset` or `\tikzmath`.
+
+Note that `\input{other.tex}` functions, but using `\include{other.tex}` is an error.  
+
 ## `.xlsx` data
 
 Ensure the sheet name is `cardlatex`. 
@@ -71,11 +115,9 @@ The top row is reserved for the variable names used in your `.tex` templates wit
 Every subsequent row are the values of these placeholders. 
 These placeholders only work within the `\cardlatex[front]` and `\cardlatex[back]` configurations.
 
-Our card is 2 by 3 cm with a 0.3cm bleed. Images are resampled to 1% of original, and 
-
 ## `cardlatex` command
 
-Compiles `.tex`/`.xml` file pairs in your terminal.
+Compiles `.tex`/`.xlsx` file pairs in your terminal.
 
 `cardlatex [<tex files>] [flags]`
 

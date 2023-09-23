@@ -1,0 +1,22 @@
+{
+    "abbrev": "",
+    "description": [
+        "https://github.com/snorthman/cardlatex"
+    ],
+    "formatVersion": 1,
+    "menu": "",
+    "name": "cardlatex",
+    "shortcut": "",
+    "tag": [
+        "%SCRIPT",
+        "app.fileSave()",
+        "fn = app.getCurrentFileName()",
+        "cmd = system(\"cardlatex \" + fn)",
+        "cmd.waitForFinished()",
+        "if (cmd.exitCode() != 0) {",
+        "\tapp.showLog()",
+        "}",
+        ""
+    ],
+    "trigger": ""
+}
