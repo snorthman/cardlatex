@@ -5,10 +5,6 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/cardlatex)
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H7PIMZR)
-
-
-
 ---
 
 <img src="example/basic.png" alt="Image Alt Text" width="1024px" />
@@ -182,3 +178,9 @@ Compiles `.tex`/`.xlsx` file pairs in your terminal.
 - `-p, --print`: Grid each row to fit on A4 or A3 paper. (in the future, other paper sizes will be included)
 - `-d, --draft`: Downsample all images for greatly improved compilation speed.
 - `-a, --all`: Override `\cardlatex[include]` configuration to be undefined.
+
+## Donate
+
+Was this useful? Consider buying me a coffee!
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H7PIMZR)
