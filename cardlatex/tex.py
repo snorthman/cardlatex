@@ -199,9 +199,10 @@ class Tex:
         self.cache_dir.mkdir(exist_ok=True, parents=True)
 
         data = self._load_or_generate_xlsx()
-        logging.info(f'{self._path}: xlsx loaded: {data.to_string()}')
+        logging.info(f'{self._path}: xlsx loaded:\n{data.to_string()}\n')
         tex = self._prepare_tex(data, **kwargs)
-        logging.info(f'{self._path}: tex content: {tex}')
+        tex_logging = '\t\n'.join(tex.split('\n'))
+        logging.info(f'{self._path}: tex content:\n{tex_logging}\n')
 
         path_log = self._path.with_suffix('.log')
         cache_tex = self.cache_dir / self._path.name
