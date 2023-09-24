@@ -157,11 +157,18 @@ class Tex:
         content = '\n'.join(content)
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
 
+        graphicpaths = r"""
+            \makeatletter
+            \typeout{cardlatex@graphicpaths}
+            \typeout{\Ginput@path}
+            \makeatother
+        """
+
         tex_blocks = [
             (None, template),
             ('user tex input', tex),
             ('newtoggles', toggles),
-            ('graphicspaths', '\\show\\graphicspath\n\\makeatletter\\typeout{\\Ginput@path}\\makeatother'),
+            ('graphicspaths', graphicpaths),
             ('document', '\\begin{document}\n'),
             (None, content.replace('\n', '\n\t')),
             (None, '\n\\end{document}')
@@ -229,7 +236,7 @@ class Tex:
 
             # gather \graphicspath items from log
             graphicspaths = [self._path.parent]
-            tex_graphicspaths = re.search(r'\\show\\graphicspath.+?({.+?)\n', log, re.DOTALL).group(1)
+            tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
             for path in tex_graphicspaths[1:-1].split('}{'):
                 if is_relative(path):
                     graphicspaths.append(graphicspaths[0] / path)
