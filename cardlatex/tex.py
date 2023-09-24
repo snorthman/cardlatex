@@ -1,5 +1,6 @@
 import hashlib
 import importlib.resources
+import logging
 import os
 import re
 import shutil
@@ -180,8 +181,10 @@ class Tex:
         result = subprocess.run(cmd, cwd=tex_file.parent,
                                 capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-        def error():
-            if result.returncode != 0 and len(result.stderr) != 124:  # stderr may have a specific and irrelevant error
+        def error():                     # stderr may have a specific and irrelevant error
+            if result.returncode == 0 or (result.stderr and len(result.stderr) == 124):
+                return
+            else:
                 shutil.copy(cache_log, tex_log)
                 raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {tex_log.resolve()}')
 
@@ -194,15 +197,19 @@ class Tex:
         self.cache_dir.mkdir(exist_ok=True, parents=True)
 
         data = self._load_or_generate_xlsx()
+        logging.info(f'{self._path}: xlsx loaded: {data.to_string()}')
         tex = self._prepare_tex(data, **kwargs)
+        logging.info(f'{self._path}: tex content: {tex}')
 
         path_log = self._path.with_suffix('.log')
         cache_tex = self.cache_dir / self._path.name
         cache_log = cache_tex.with_suffix('.log')
 
+        logging.info(f'{self._path}: resampled missing images')
         if kwargs.get('draft', False):
             with open(cache_tex, 'w') as f:
                 f.write(tex)
+            logging.info(f'{self._path}: wrote tex contents to {cache_tex}')
 
             # resample existing images
             for directory, _, filenames in os.walk(self._cache_dir):
@@ -211,10 +218,12 @@ class Tex:
                         img = Image(self._path.parent, self.cache_dir)
                         img.find_source_from_cache(root / file)
                         img.resample()
+            logging.info(f'{self._path}: resampled existing images')
 
             xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
             with open(cache_log, 'r') as f:
                 log = f.read()
+            logging.info(f'{self._path}: reading log contents at {cache_log}')
 
             # gather \graphicspath items from log
             graphicspaths = [self._path.parent]
@@ -234,6 +243,7 @@ class Tex:
                     img = Image(self._path.parent, self.cache_dir)
                     img.find_source_from_directories(file, *graphicspaths)
                     img.resample()
+                logging.info(f'{self._path}: resampled missing images')
 
                 xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
 
@@ -252,6 +262,7 @@ class Tex:
                 path = path_tex.with_suffix(suffix)
                 if path.exists():
                     action(*(path, *args))
+            logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
 
             xelatex_error_func()
 
@@ -263,8 +274,13 @@ class Tex:
             output = self.cache_dir / self._path.name
             log, pdf = output.with_suffix('.log'), output.with_suffix('.pdf')
 
-            shutil.copy(output.with_suffix('.tex'), self._path.with_suffix('.cardlatex.tex'))
+            shutil.copy(output.with_suffix('.tex'), path_tex := self._path.with_suffix('.cardlatex.tex'))
+            logging.info(f'{self._path}: copied tex to {path_tex}')
             if log.exists():
-                shutil.copy(output.with_suffix('.log'), self._path.with_suffix('.log'))
+                shutil.copy(output.with_suffix('.log'), path_log := self._path.with_suffix('.log'))
+                logging.info(f'{self._path}: copied tex to {path_log}')
             if pdf.exists():
-                shutil.move(output.with_suffix('.pdf'), self._path.with_suffix('.pdf'))
+                shutil.move(output.with_suffix('.pdf'), path_pdf := self._path.with_suffix('.pdf'))
+                logging.info(f'{self._path}: copied tex to {path_pdf}')
+
+            logging.info(f'{self._path}: released')
