@@ -28,7 +28,7 @@ To get started with **cardlatex**, you'll need:
 * [MiKTeX](https://miktex.org/download)
 * [ImageMagick](https://imagemagick.org/script/download.php) (make sure to check `Install development headers and libraries for C and C++`)
 * [Python](https://www.python.org/downloads/)
-* [TeXstudio](https://www.texstudio.org/) (optional; if you do, import our helpful TeXstudio macro)
+* [TeXstudio](https://www.texstudio.org/) (optional; if you do, import our helpful [TeXstudio macros](texstudio/))
 
 After these prerequisites are installed, in a terminal:
 
@@ -54,7 +54,9 @@ choco install texstudio.install
 ```
 project/
 ├── card.tex
-└── card.xlsx
+├── card.xlsx
+└── art/
+    └── background.png
 ```
 
 `card.tex`
@@ -62,7 +64,7 @@ project/
 ```latex
 \cardlatex[width]{2cm}
 \cardlatex[height]{3cm}
-\cardlatex[bleed]{0.3cm}
+\cardlatex[bleed]{0.125in}
 \cardlatex[include]{1...2,4}
 \cardlatex[front]{
     \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
@@ -72,8 +74,7 @@ project/
 }
 ```
 
-Our card is 2 cm by 3 cm with a 0.3cm bleed. Images are resampled to 1% of original, and we are only interested in compiling
-rows 1, 2 and 4.
+Our card is 2 cm by 3 cm with a 0.125in bleed. We are only interested in compiling rows 1, 2 and 4.
 
 `card.xlsx`
 
@@ -87,7 +88,7 @@ rows 1, 2 and 4.
 In directory in which these files exist, we run:
 
 ```commandline
-cardlatex card.tex
+cardlatex card.tex --draft
 ```
 
 This will output three new files:
@@ -170,11 +171,11 @@ These placeholders only work within the `\cardlatex[front]` and `\cardlatex[back
 
 Compiles `.tex`/`.xlsx` file pairs in your terminal.
 
-`cardlatex [<tex files>] [flags]`
+`cardlatex [<tex file(s)>] [flags]`
 
 ### Flags
 
-- `-c, --combine`: Combine all output PDF files to one. Has no effect is compiling only one `.tex` file.
+- `-c, --combine`: Combine all output PDF files to one. Has no effect if compiling only one `.tex` file.
 - `-p, --print`: Grid each row to fit on A4 or A3 paper. (in the future, other paper sizes will be included)
 - `-d, --draft`: Downsample all images for greatly improved compilation speed.
 - `-a, --all`: Override `\cardlatex[include]` configuration to be undefined.

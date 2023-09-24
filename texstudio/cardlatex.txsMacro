@@ -5,7 +5,7 @@
     ],
     "formatVersion": 1,
     "menu": "",
-    "name": "cardlatex",
+    "name": "cardlatex --draft",
     "shortcut": "",
     "tag": [
         "%SCRIPT",
