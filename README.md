@@ -2,6 +2,13 @@
 
 **cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` and `.xlsx` files. Both `.tex` and `.xlsx` must share the same file name.
 
+
+![PyPI - Version](https://img.shields.io/pypi/v/cardlatex)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/H2H7PIMZR)
+
+
+
 ---
 
 <img src="example/basic.png" alt="Image Alt Text" width="1024px" />
