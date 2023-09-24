@@ -1,5 +1,6 @@
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Tuple
 
@@ -23,9 +24,12 @@ from .tex import Tex
 @click.option('--debug', is_flag=True, hidden=True)
 @click.version_option(version)
 def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, draft: bool, debug: bool):
+    start = datetime.now()
     context = click.get_current_context()
+    logging.info(f'cardlatex {version}\t{context.params}')
 
     logger = logging.getLogger()
+    [logger.removeHandler(handler) for handler in logger.handlers]
     handler = logging.FileHandler(filename=(tempdir / 'cardlatex.log').as_posix(), mode='w')
     handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logger.addHandler(handler)
@@ -47,12 +51,15 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, dr
             [b.release() for b in builds]
     except Exception as e:
         print(e, file=sys.stderr)
-        logging.info(f'cardlatex {version}\t{context.params}')
         logging.exception(e)
         if debug:
             raise e
         else:
             exit(1)
+    finally:
+        end = datetime.now() - start
+        print(f'cardlatex ran for {end}')
+        logging.info(f'process ended in {end}')
 
 
 if __name__ == '__main__':

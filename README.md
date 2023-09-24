@@ -2,6 +2,20 @@
 
 **cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` and `.xlsx` files. Both `.tex` and `.xlsx` must share the same file name.
 
+---
+
+<img src="example/basic.png" alt="Image Alt Text" width="1024px" />
+
+---
+
+<img src="example/draft.png" alt="Image Alt Text" width="1024px" />
+
+---
+
+<img src="example/print.png" alt="Image Alt Text" width="1024px" />
+
+---
+
 ## Getting started
 
 ### Prerequisites
@@ -97,7 +111,8 @@ Configurations are defined in the `.tex` document. Defining the same variable mo
 - `ppi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
 This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, -300)` (with no length hint) will be positioned at 300 pixels from the top left.
 - `bleed (length)`: `default = 0` Bleed margin of the card.
-- `spacing (length)`: `default = 0` Spacing between cards when `--print` is used.
+
+[//]: # (- `spacing &#40;length&#41;`: `default = 0` Spacing between cards when `--print` is used.)
 - `include (numbers)`: Compile only specific rows. If left undefined, all rows in the XML are compiled. Accepts numbers `n > 0` and ranges `i...j`.
 - `front (text)`: `required` Front template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
 - `back (text)`: Back template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
