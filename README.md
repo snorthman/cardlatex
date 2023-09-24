@@ -46,7 +46,6 @@ project/
 \cardlatex[width]{2cm}
 \cardlatex[height]{3cm}
 \cardlatex[bleed]{0.3cm}
-\cardlatex[quality]{1}
 \cardlatex[include]{1...2,4}
 \cardlatex[front]{
     \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
@@ -98,7 +97,7 @@ Configurations are defined in the `.tex` document. Defining the same variable mo
 - `ppi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
 This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, -300)` (with no length hint) will be positioned at 300 pixels from the top left.
 - `bleed (length)`: `default = 0` Bleed margin of the card.
-- `quality (number)`: `default = 100` Quality of `\includegraphics` images. Useful for testing. Must be between 1 and 100.
+- `spacing (length)`: `default = 0` Spacing between cards when `--print` is used.
 - `include (numbers)`: Compile only specific rows. If left undefined, all rows in the XML are compiled. Accepts numbers `n > 0` and ranges `i...j`.
 - `front (text)`: `required` Front template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
 - `back (text)`: Back template of the card. May contain any TeX, TikZ and placeholder variables `<$var$>`.
@@ -107,6 +106,40 @@ Any additional TeX will be run as normal, but using the `\begin{document}` envir
 For example, you can write additional `\newcommand` macros for your template, or prepare TikZ with `\tikzset` or `\tikzmath`.
 
 Note that `\input{other.tex}` functions, but using `\include{other.tex}` is an error.  
+
+### TikZ macros
+
+Some coordinates are preset, useful for anchoring other shapes. All coordinates are within the `bleed` margin.
+
+* `C`: Center of card.
+* `TL`: Top-left of card.
+* `T`: Top-center of card.
+* `TR`: Top-right of card.
+* `R`: Right-center of card.
+* `BR`: Bottom-right of card.
+* `B`: Bottom-center of card.
+* `BL`: Bottom-left of card.
+* `L`: Left-center of card.
+
+Some dimensions are also preset.
+
+* `\bleed`: Bleed margin.
+* `\cardx`: Width of card.
+* `\cardy`: Height of card.
+
+Two TikZ layers are included, `background` and `foreground`.
+
+Finally, a `\tikzset` is preset for convenience, but can be overwritten:
+
+```\tikzset{inner sep=0cm,outer sep=0cm,text badly ragged}```
+
+**Example usage:**
+
+```latex
+\begin{foreground}
+    \node[anchor=center,yshift=\bleed] at (C) {\includegraphics[width=2cm]{hero/<$class$>_symbol.png}};
+\end{foreground}
+```
 
 ## `.xlsx` data
 
@@ -125,5 +158,5 @@ Compiles `.tex`/`.xlsx` file pairs in your terminal.
 
 - `-c, --combine`: Combine all output PDF files to one. Has no effect is compiling only one `.tex` file.
 - `-p, --print`: Grid each row to fit on A4 or A3 paper. (in the future, other paper sizes will be included)
-- `-q, --quality <number>`: Override `\cardlatex[quality]` configuration to be set to `<number>`.
+- `-d, --draft`: Downsample all images for greatly improved compilation speed.
 - `-a, --all`: Override `\cardlatex[include]` configuration to be undefined.
