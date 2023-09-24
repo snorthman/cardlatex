@@ -1,0 +1,20 @@
+{
+    "abbrev": "",
+    "description": [
+        "https://github.com/snorthman/cardlatex"
+    ],
+    "formatVersion": 1,
+    "menu": "",
+    "name": "\\cardlatex",
+    "shortcut": "",
+    "tag": [
+        "\\cardlatex[width]{2.5in}",
+        "\\cardlatex[height]{3.5in}",
+        "\\cardlatex[bleed]{0.125in}",
+        "\\cardlatex[include]{0}",
+        "\\cardlatex[front]{",
+        "\t%|",
+        "}"
+    ],
+    "trigger": "cardlatex/"
+}

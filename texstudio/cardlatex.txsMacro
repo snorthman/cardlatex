@@ -11,7 +11,7 @@
         "%SCRIPT",
         "app.fileSave()",
         "fn = app.getCurrentFileName()",
-        "cmd = system(\"cardlatex \" + fn)",
+        "cmd = system(\"cardlatex --draft \" + fn)",
         "cmd.waitForFinished()",
         "if (cmd.exitCode() != 0) {",
         "\tapp.showLog()",

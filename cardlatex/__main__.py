@@ -18,11 +18,11 @@ from .tex import Tex
               help='Combine source tex files into a single PDF file.')
 @click.option('-p', '--print', 'paper', is_flag=True,  # type=click.Choice([p.value for p in PaperEnum]), default=None,
               help='Arranges all cards in grids in either A4 or A3 sizes.')
-@click.option('-q', '--quality', type=click.IntRange(1, 100),
-              help=r'Override the \cardlatex[quality] configuration to QUALITY%.')
+@click.option('-d', '--draft', is_flag=True,
+              help=r'Resample all images to a much smaller size to improve compilation speeds.')
 @click.option('--debug', is_flag=True, hidden=True)
 @click.version_option(version)
-def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, quality: int, debug: bool):
+def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, draft: bool, debug: bool):
     context = click.get_current_context()
 
     logger = logging.getLogger()
@@ -40,7 +40,7 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, qu
 
         if combine and len(builds) > 1:
             if not all([b.completed for b in builds]):
-                raise RuntimeError('Not all .tex files have succeeded.')
+                raise RuntimeError('Not all .tex files have succesfully compiled.')
             combine_pdf(*[b.output for b in builds])
             builds[0].release()
         else:

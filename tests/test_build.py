@@ -8,12 +8,12 @@ from typing import Callable
 import pytest
 from click import BaseCommand
 from click.testing import CliRunner
-from pikepdf import Pdf, Page
+from pikepdf import Pdf
 
 from cardlatex.__main__ import build
 from cardlatex.tex import Tex
 
-args_build_params = [['all'], ['combine'], ['print'], ['quality', '25']]
+args_build_params = [['all'], ['combine'], ['print'], ['draft']]
 
 
 @pytest.fixture(params=chain(*[combinations(args_build_params, n) for n in range(len(args_build_params) + 1)]))
@@ -32,8 +32,7 @@ def args_build(request) -> tuple[list[str], str]:
 
 @pytest.fixture(params=[
     (['missing'], 'default', ValueError),
-    (['default'], 'invalid', ValueError),
-    (['default'], 'incomplete', FileNotFoundError)
+    (['default'], 'invalid', ValueError)
 ])
 def args_build_fail(request) -> tuple[list[str], str, Exception]:
     return request.param
@@ -79,7 +78,8 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
     result = runner.invoke(func, arguments + ['--debug'])
     if result.exit_code != 0:
         exception = result.exc_info[0]
-        assert exception == expected_exception, ''.join([' '.join(arguments)] + ['\n'] + traceback.format_exception(result.exception))
+        if exception != expected_exception:
+            raise result.exception
     else:
         assert expected_exception is None
 
@@ -147,3 +147,11 @@ def test_cache(args_build: tuple[str, str]):
 
 def test_build_specific():
     run(build, None, *prepare('default', *['back']), **{})
+
+
+temp = Path('./tests/input/temp')
+
+
+@pytest.mark.skipif(temp.exists() and len(list(temp.iterdir())) == 0, reason='No temp files found')
+def test_build_temp():
+    run(build, None, './tests/input/temp/hero_card.tex', '--draft')

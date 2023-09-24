@@ -456,4 +456,5 @@ TSWLatexianTemp*
 #*Notes.bib
 
 /tests/output
+/tests/input/temp
 /choco/test

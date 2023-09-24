@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 from typing import List
 
 
@@ -10,7 +11,6 @@ required_props = set()
 
 
 class Config:
-
     @staticmethod
     def required(prop):
         required_props.add(prop.__name__)
@@ -32,7 +32,7 @@ class Config:
             props.add(prop)
 
             b = 1
-            rb: re.Match = None
+            rb: re.Match | None = None
             for rb in re.finditer(r'(?<!\\)[{}]', tex[match.end():]):
                 b = b + (1 if rb.group() == '{' else -1)
                 if b == 0:
@@ -103,17 +103,7 @@ class Config:
 
     @dpi.setter
     def dpi(self, value: str):
-        self._config['dpi'] = str(float(value))
-
-    @property
-    def quality(self) -> str:
-        return self._config.get('quality', 100)
-
-    @quality.setter
-    def quality(self, value: int):
-        value = int(value)
-        assert 100 >= value >= 1, ValueError(f'value must be between 1 and 100 ("{value}") for quality')
-        self._config['quality'] = value
+        self._config['dpi'] = str(value)
 
     @property
     def include(self) -> List[int]:

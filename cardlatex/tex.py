@@ -5,20 +5,45 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Set, List
 
 import numpy as np
 import pandas as pd
 
 from . import tempdir
 from .config import Config
-from .image import Image
+from .image import Image, is_relative
 
 
 def sha256(encode: str) -> str:
     obj = hashlib.sha1()
     obj.update(encode.encode('utf-8'))
     return obj.hexdigest()
+
+
+def prepare_template(template: str, config: Config):
+    """
+    Apply config options to the static resources/template.tex
+    """
+    for r in re.finditer(r'<\$(\w+)\$>', template):
+        value = getattr(config, r.group(1))
+        template = template.replace(r.group(), value)
+    return template
+
+
+def prepare_inputs(tex: str, tex_dir: Path):
+    r"""
+    Insert recursively any \input{} directives into the document
+    """
+    while matches := list(re.finditer(r'^(.*)(\\input\{([\w.]+)})', tex, re.M)):
+        for r in matches:
+            input_tex = r.group(2)
+            input_path = (tex_dir / r.group(3)).with_suffix('.tex')
+            if '%' in r.group(1) or not input_path.exists():
+                tex = tex.replace(input_tex, '')
+            else:
+                with open(input_path, 'r') as f:
+                    tex = tex.replace(input_tex, f.read())
+    return tex
 
 
 class Tex:
@@ -30,7 +55,8 @@ class Tex:
             self._tex = f.read()
 
         self._config = Config(self._tex)
-        self._variables = sorted(list(({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})))
+        self._variables = sorted(
+            list(({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})))
         self._cache_dir = self.get_cache_dir(self._path)
         self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
         self._completed = False
@@ -69,7 +95,8 @@ class Tex:
                 except ValueError as e:
                     raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
 
-                data_columns = pd.Index([*data_existing.columns] + [c for c in self._variables if c not in data_existing])
+                data_columns = pd.Index(
+                    [*data_existing.columns] + [c for c in self._variables if c not in data_existing])
                 data_existing = data_existing.reindex(columns=data_columns)
             else:
                 data_columns = pd.Index([*sorted(self._variables)])
@@ -92,9 +119,16 @@ class Tex:
             return pd.DataFrame()
 
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
+        """
+        Prepare contents of the cardlatex.tex document
+        """
         build_all = kwargs.get('build_all', False)
 
-        tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n'
+        template = prepare_template(self._template, self._config)
+        tex = prepare_inputs(self._tex, self._path.parent)
+
+        # \begin{tikzcard}[dpi]{width}{height}{
+        tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n\n'
         edges = [self._config.front]
         if self.has_back:
             edges.append(self._config.back)
@@ -109,26 +143,24 @@ class Tex:
                     value = '' if pd.isna(item) else item
 
                     if re.search(r'\\if<\$' + key + r'\$>', edge):
+                        # add any unique <$variables$> to 'toggles', in case we use \if<$variable$>
                         toggles.add(key)
                         edge_toggles.append((r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}')
 
                     edge = edge.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}')
-                    edge = edge.replace(f'<${key}$>', value)
+                    edge = edge.replace(f'<${key}$>', str(value))
 
+                # any toggles, \begin{tikzcard}...{content}\end{tikzcard}
                 content.append('\n'.join(edge_toggles) + tikz + edge + '\n\\end{tikzcard}%\n')
 
         content = '\n'.join(content)
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
 
-        template = self._template
-        for r in re.finditer(r'<\$(\w+)\$>', self._template):
-            value = getattr(self._config, r.group(1))
-            template = template.replace(r.group(), value)
-
         tex_blocks = [
             (None, template),
-            ('user tex', self._tex),
+            ('user tex input', tex),
             ('newtoggles', toggles),
+            ('graphicspaths', '\\show\\graphicspath\n\\makeatletter\\typeout{\\Ginput@path}\\makeatother'),
             ('document', '\\begin{document}\n'),
             (None, content.replace('\n', '\n\t')),
             (None, '\n\\end{document}')
@@ -142,37 +174,18 @@ class Tex:
 
         return tex
 
-    def _resample_images(self, tex: str, quality: int):
-        begin_document = re.search(r'\\begin{document}', tex)
-        assert begin_document, r'no \begin{document}?'
+    @staticmethod
+    def _xelatex(tex_file: Path, tex_log: Path, cache_log: Path):
+        cmd = f'xelatex.exe -interaction=nonstopmode "{tex_file.stem}".tex'
+        result = subprocess.run(cmd, cwd=tex_file.parent,
+                                capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
-        # untested
-        graphics_dirs = [self._path.parent]
-        for r in re.finditer(r'\\graphicspath{(.+)}', tex):
-            for p in re.finditer(r'{.+}', r.group(1)):
-                path = p.group()
-                if path.startswith('.'):  # relative path
-                    graphics_dirs.append(graphics_dirs[0] / path)
-                else:
-                    graphics_dirs.append(Path(path))
+        def error():
+            if result.returncode != 0 and len(result.stderr) != 124:  # stderr may have a specific and irrelevant error
+                shutil.copy(cache_log, tex_log)
+                raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {tex_log.resolve()}')
 
-        images: Set[Image] = set({Image(self.cache_dir, Path(r.group(1))) for r in re.finditer(r'\\includegraphics.*?{([^}]+)}', tex[begin_document.end():])})
-        for img in images:
-            for graphics_dir in graphics_dirs:
-                img.resample(graphics_dir, quality)
-            if not img.resampled:
-                raise FileNotFoundError(f'Could not find {img.path.as_posix()}')
-
-    def _copy_inputs(self, tex: str):
-        matches: List[re.Match] = list(re.finditer(r'^(.*)\\input\{(\w+)}', tex, re.M))
-        for match in matches:
-            if '%' in match.group(1):
-                continue
-
-            name = match.group(2) + '.tex'
-            path = self._path.parent / name
-            if path.exists():
-                shutil.copy(path, self.cache_dir / name)
+        return error
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -183,25 +196,64 @@ class Tex:
         data = self._load_or_generate_xlsx()
         tex = self._prepare_tex(data, **kwargs)
 
-        quality = kwargs.get('quality') or self._config.quality
-        if quality < 100:
-            self._resample_images(tex, quality)
+        path_log = self._path.with_suffix('.log')
+        cache_tex = self.cache_dir / self._path.name
+        cache_log = cache_tex.with_suffix('.log')
+
+        if kwargs.get('draft', False):
+            with open(cache_tex, 'w') as f:
+                f.write(tex)
+
+            # resample existing images
+            for directory, _, filenames in os.walk(self._cache_dir):
+                if (root := Path(directory)) != self._cache_dir:
+                    for file in filenames:
+                        img = Image(self._path.parent, self.cache_dir)
+                        img.find_source_from_cache(root / file)
+                        img.resample()
+
+            xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
+            with open(cache_log, 'r') as f:
+                log = f.read()
+
+            # gather \graphicspath items from log
+            graphicspaths = [self._path.parent]
+            tex_graphicspaths = re.search(r'\\show\\graphicspath.+?({.+?)\n', log, re.DOTALL).group(1)
+            for path in tex_graphicspaths[1:-1].split('}{'):
+                if is_relative(path):
+                    graphicspaths.append(graphicspaths[0] / path)
+
+            # gather missing images from log
+            not_found = []
+            for pattern in [r'! LaTeX Error: File `(.+)\' not found', r'LaTeX Warning: File `(.+)\' not found']:
+                not_found.extend(r.group(1) for r in re.finditer(pattern, log))
+
+            # resample missing images
+            if not_found:
+                for file in not_found:
+                    img = Image(self._path.parent, self.cache_dir)
+                    img.find_source_from_directories(file, *graphicspaths)
+                    img.resample()
+
+                xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
+
+            xelatex_error_func()
         else:
-            tex = tex.replace(r'%\graphicspath{{}}', r'\graphicspath{{' + self._path.parent.resolve().as_posix() + '}}')
+            with open(path_tex := self._path.with_suffix('.cardlatex.tex'), 'w') as f:
+                f.write(tex)
+            xelatex_error_func = self._xelatex(path_tex, path_log, cache_log)
 
-        self._copy_inputs(tex)
-        with open(tex_out := self.cache_dir / self._path.name, 'w') as f:
-            f.write(tex)
+            # delete, copy or move output to cache_dir to prepare for self.release()
+            for suffix, action, args in [('.synctex.gz', os.remove, ()),
+                                         ('.aux', os.remove, ()),
+                                         ('.log', shutil.move, (cache_log,)),
+                                         ('.pdf', shutil.move, (self._cache_output_pdf,)),
+                                         ('.tex', shutil.copy, (cache_tex,))]:
+                path = path_tex.with_suffix(suffix)
+                if path.exists():
+                    action(*(path, *args))
 
-        cmd = f'xelatex.exe -interaction=nonstopmode "{tex_out.stem}".tex'
-        result = subprocess.run(cmd, cwd=tex_out.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if (aux := tex_out.with_suffix('.aux')).exists():
-            os.remove(aux)
-
-        if result.returncode != 0:
-            _path_log = self._path.with_suffix('.log')
-            shutil.copy(tex_out.with_suffix('.log'), _path_log)
-            raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {_path_log.resolve()}')
+            xelatex_error_func()
 
         self._completed = True
         return self
