@@ -183,8 +183,10 @@ class Tex:
 
         def error():                     # stderr may have a specific and irrelevant error
             if result.returncode == 0 or (result.stderr and len(result.stderr) == 124):
+                logging.info(result)
                 return
             else:
+                logging.error(result)
                 shutil.copy(cache_log, tex_log)
                 raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {tex_log.resolve()}')
 
