@@ -27,7 +27,7 @@ To get started with **cardlatex**, you'll need:
 
 * [MiKTeX](https://miktex.org/download)
 * [ImageMagick](https://imagemagick.org/script/download.php) (make sure to check `Install development headers and libraries for C and C++`)
-* [Python](https://www.python.org/downloads/)
+* [Python](https://www.python.org/downloads/) (>=3.10, use `python --version` to check)
 * [TeXstudio](https://www.texstudio.org/) (optional; if you do, import our helpful [TeXstudio macros](texstudio/))
 
 After these prerequisites are installed, in a terminal:

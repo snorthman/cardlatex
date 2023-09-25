@@ -12,6 +12,7 @@ if __name__ == '__main__':
         author='Stan Noordman',
         author_email='snorthman1@gmail.com',
         description='cardlatex is a XeLaTeX wrapper which compiles TeX from specific templated .tex and .xlsx files.',
+        python_requires='>=3.10, <4',
         install_requires=[
             'click',
             'openpyxl',
