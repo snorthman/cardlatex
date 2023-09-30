@@ -44,6 +44,7 @@ class Image:
                 self._tex_path = Path(f.read())
             self._cache_path = file.with_suffix(self._tex_path.suffix)
         else:
+            os.remove(file)
             raise FileNotFoundError(f'{file_info} cache object not found')
 
     @property

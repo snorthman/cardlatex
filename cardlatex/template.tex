@@ -37,8 +37,6 @@
 % CARDLATEX
 
 \def\bleed{<$bleed$>}
-%\def\spacing{<$spacing$>}
-\def\spacing{0.125in}  % temporary measure
 \def\setcoords{
 	\coordinate (TL) at (0,0);
 	\coordinate (TR) at (\cardx,0);
@@ -63,8 +61,8 @@
 	\ifdimequal{\pgfmathresult pt}{0pt}{}{
 		\pgfkeys{/pgf/fpu,/pgf/fpu/output format=fixed}
 		\tikzmath{
-			\resolutionx=(10/(#1))*(\cardx/(\cardx+\bleed));
-			\resolutiony=(10/(#1))*(\cardy/(\cardy+\bleed));
+			\resolutionx=(10/((#1)/2.54))*(\cardx/(\cardx+\bleed));
+			\resolutiony=(10/((#1)/2.54))*(\cardy/(\cardy+\bleed));
 		}
 		\pgfsetxvec{\pgfpoint{\resolutionx mm}{0cm}}
 		\pgfsetyvec{\pgfpoint{0mm}{-\resolutiony mm}}
@@ -73,13 +71,7 @@
 }{
 	\setcoords
 	\begin{pgfonlayer}{print}
-		\draw[fill=black] 	  ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
-		\ifdimgreater{\spacing}{0cm}{
-			\draw[line width=1mm] ([xshift=-\spacing*2.5,yshift= 0.5*\spacing]TL) -- ([xshift= \spacing*2.5,yshift= 0.5*\spacing]TR);
-			\draw[line width=1mm] ([xshift= \spacing*0.5,yshift= 2.5*\spacing]TR) -- ([xshift= \spacing*0.5,yshift=-2.5*\spacing]BR);
-			\draw[line width=1mm] ([xshift= \spacing*2.5,yshift=-0.5*\spacing]BR) -- ([xshift=-\spacing*2.5,yshift=-0.5*\spacing]BL);
-			\draw[line width=1mm] ([xshift=-\spacing*0.5,yshift=-2.5*\spacing]BL) -- ([xshift=-\spacing*0.5,yshift= 2.5*\spacing]TL);
-		}{}
+		\draw[fill=black] ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
 	\end{pgfonlayer}
 	\pgfsetxvec{\pgfpoint{1cm}{0cm}}
 	\pgfsetyvec{\pgfpoint{0cm}{1cm}}

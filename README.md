@@ -2,6 +2,7 @@
 
 **cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` and `.xlsx` files. Both `.tex` and `.xlsx` must share the same file name.
 
+**Please note this is a pre-release.**
 
 ![PyPI - Version](https://img.shields.io/pypi/v/cardlatex)
 
@@ -112,8 +113,8 @@ Configurations are defined in the `.tex` document. Defining the same variable mo
 
 - `width (length)`: `required` Width of the card.
 - `height (length)`: `required` Height of the card.
-- `ppi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
-This is helpful when defining pixel-perfect coordinate positioning, as a node at `(300, -300)` (with no length hint) will be positioned at 300 pixels from the top left.
+- `dpi (number)`: `default = 0` Calculate by dividing the pixels in width or height with the width or height in inches. 
+This is helpful when defining pixel-perfect coordinate positioning. If your background image has a resolution of 2048 pixels, and your card is 3.5in, `\cardlatex[dpi]{2048/3.5}` will have a node at `(300, -300)` (with no length hint) will be positioned at 300 pixels from the top left.
 - `bleed (length)`: `default = 0` Bleed margin of the card.
 
 [//]: # (- `spacing &#40;length&#41;`: `default = 0` Spacing between cards when `--print` is used.)

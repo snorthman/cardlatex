@@ -1,12 +1,13 @@
 from setuptools import setup
 
-version = '0.4.1'
+version = '0.4.2'
 
 if __name__ == '__main__':
     setup(
         name='cardlatex',
         version=version,
         packages=['cardlatex'],
+        package_data={"cardlatex": ["*.tex"]},
         url=r'https://github.com/snorthman/cardlatex',
         license='MIT License',
         author='Stan Noordman',

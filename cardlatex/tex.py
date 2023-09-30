@@ -1,5 +1,4 @@
 import hashlib
-import importlib.resources
 import logging
 import os
 import re
@@ -13,6 +12,7 @@ import pandas as pd
 from . import tempdir
 from .config import Config
 from .image import Image, is_relative
+from .template import template as template_tex
 
 
 def sha256(encode: str) -> str:
@@ -64,8 +64,12 @@ class Tex:
 
     @staticmethod
     def template() -> str:
-        with importlib.resources.open_text('cardlatex.resources', 'template.tex') as f:
-            return f.read()
+        return template_tex
+        # with resources.open_text(cardlatex.resources, 'template.tex') as f:
+        #     return f.read()
+        # template_path = pkg_resources.resource_filename('cardlatex.resources', 'template.tex')
+        # with open(template_path) as f:
+        #     return f.read()
 
     @staticmethod
     def get_cache_dir(tex: Path | str):
@@ -225,8 +229,11 @@ class Tex:
                 if (root := Path(directory)) != self._cache_dir:
                     for file in filenames:
                         img = Image(self._path.parent, self.cache_dir)
-                        img.find_source_from_cache(root / file)
-                        img.resample()
+                        try:
+                            img.find_source_from_cache(root / file)
+                            img.resample()
+                        except FileNotFoundError as e:
+                            logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
             xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
