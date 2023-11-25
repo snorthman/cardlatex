@@ -97,11 +97,11 @@ class Tex:
             if path_xlsx.exists():
                 try:
                     data_existing = pd.read_excel(path_xlsx, sheet_name='cardlatex')
+                    data_existing = data_existing.fillna('').astype(str)
                 except ValueError as e:
                     raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
 
-                data_columns = pd.Index(
-                    [*data_existing.columns] + [c for c in self._variables if c not in data_existing])
+                data_columns = pd.Index([*data_existing.columns] + [c for c in self._variables if c not in data_existing])
                 data_existing = data_existing.reindex(columns=data_columns)
             else:
                 data_columns = pd.Index([*sorted(self._variables)])

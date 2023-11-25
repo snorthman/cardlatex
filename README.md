@@ -149,6 +149,8 @@ Some dimensions are also preset.
 
 Two TikZ layers are included, `background` and `foreground`.
 
+You can conditionally include or exclude columns using `\if<$var$>{true}{false}`. It is `false` when the cell has no content.
+
 Finally, a `\tikzset` is preset for convenience, but can be overwritten:
 
 ```\tikzset{inner sep=0cm,outer sep=0cm,text badly ragged}```
