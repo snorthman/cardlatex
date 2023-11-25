@@ -96,8 +96,7 @@ class Tex:
             path_xlsx = self._path.with_suffix('.xlsx')
             if path_xlsx.exists():
                 try:
-                    data_existing = pd.read_excel(path_xlsx, sheet_name='cardlatex')
-                    data_existing = data_existing.fillna('').astype(str)
+                    data_existing = pd.read_excel(path_xlsx, sheet_name='cardlatex', dtype=str, na_filter=False)
                 except ValueError as e:
                     raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
 

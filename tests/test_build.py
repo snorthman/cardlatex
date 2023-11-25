@@ -154,4 +154,4 @@ temp = Path('./tests/input/temp')
 
 @pytest.mark.skipif(temp.exists() and len(list(temp.iterdir())) == 0, reason='No temp files found')
 def test_build_temp():
-    run(build, None, './tests/input/temp/hero_card.tex', '--draft')
+    run(build, None, './tests/input/temp/card.tex', '--draft')
