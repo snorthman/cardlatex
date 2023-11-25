@@ -242,11 +242,15 @@ class Tex:
             logging.info(f'{self._path}: reading log contents at {cache_log}')
 
             # gather \graphicspath items from log
-            graphicspaths = [self._path.parent]
+            base_path = self._path.parent
+            graphicspaths = [base_path]
             tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
             for path in tex_graphicspaths[1:-1].split('}{'):
                 if is_relative(path):
-                    graphicspaths.append(graphicspaths[0] / path)
+                    graphicspaths.append(base_path / path)
+            for path in graphicspaths:
+                if not path.is_relative_to(base_path):
+                    raise ValueError(f'{path} is not relative to the base directory {base_path}')
 
             # gather missing images from log
             not_found = []
