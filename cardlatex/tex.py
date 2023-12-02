@@ -188,19 +188,8 @@ class Tex:
     @staticmethod
     def _xelatex(tex_file: Path, tex_log: Path, cache_log: Path):
         cmd = f'xelatex.exe -interaction=nonstopmode "{tex_file.stem}".tex'
-        result = subprocess.run(cmd, cwd=tex_file.parent,
+        return subprocess.run(cmd, cwd=tex_file.parent,
                                 capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        def error():                     # stderr may have a specific and irrelevant error
-            if result.returncode == 0 or (result.stderr and len(result.stderr) == 124):
-                logging.info(result)
-                return
-            else:
-                logging.error(result)
-                shutil.copy(cache_log, tex_log)
-                raise subprocess.SubprocessError(f'XeLaTeX compilation error(s), see {tex_log.resolve()}')
-
-        return error
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -214,6 +203,7 @@ class Tex:
         logging.info(f'{self._path}: tex content:\n\n{tex}\n')
 
         path_log = self._path.with_suffix('.log')
+        path_tex = self._path.with_suffix('.cardlatex.tex')
         cache_tex = self.cache_dir / self._path.name
         cache_log = cache_tex.with_suffix('.log')
 
@@ -235,7 +225,7 @@ class Tex:
                             logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
-            xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
+            xelatex_result = self._xelatex(cache_tex, path_log, cache_log)
             with open(cache_log, 'r') as f:
                 log = f.read()
             logging.info(f'{self._path}: reading log contents at {cache_log}')
@@ -264,13 +254,11 @@ class Tex:
                     img.resample()
                 logging.info(f'{self._path}: resampled missing images')
 
-                xelatex_error_func = self._xelatex(cache_tex, path_log, cache_log)
-
-            xelatex_error_func()
+                xelatex_result = self._xelatex(cache_tex, path_log, cache_log)
         else:
-            with open(path_tex := self._path.with_suffix('.cardlatex.tex'), 'w') as f:
+            with open(path_tex, 'w') as f:
                 f.write(tex)
-            xelatex_error_func = self._xelatex(path_tex, path_log, cache_log)
+            xelatex_result = self._xelatex(path_tex, path_log, cache_log)
 
             # delete, copy or move output to cache_dir to prepare for self.release()
             for suffix, action, args in [('.synctex.gz', os.remove, ()),
@@ -283,7 +271,19 @@ class Tex:
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
 
-            xelatex_error_func()
+        if xelatex_result.returncode == 0 or (xelatex_result.stderr and len(xelatex_result.stderr) == 124):
+            # stderr may have a specific and irrelevant error
+            logging.info(xelatex_result)
+        else:
+            logging.error(xelatex_result)
+            with open(cache_log, 'r') as f:
+                errors = re.finditer(r'(! .+)[\s\S]+?(l\.\d+ .+\n)[\s\S]+?\n\n', f.read())
+            errors = '\n'.join([f'{e.group(1)}\n{e.group(2)}' for e in errors])
+            error_s = 'errors' if len(errors) > 1 else 'error'
+
+            shutil.copy(cache_log, path_log)
+            shutil.copy(cache_tex, path_tex)
+            raise subprocess.SubprocessError(f'{errors}\nXeLaTeX compilation {error_s}, see {path_log.resolve()}')
 
         self._completed = True
         return self

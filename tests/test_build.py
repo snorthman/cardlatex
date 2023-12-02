@@ -146,7 +146,7 @@ def test_cache(args_build: tuple[str, str]):
 
 
 def test_build_specific():
-    run(build, None, *prepare('default', *['default']), **{'draft': ''})
+    run(build, None, *prepare('default', *['missing']), **{'draft': ''})
 
 
 temp = Path('./tests/input/temp')
