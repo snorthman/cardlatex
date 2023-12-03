@@ -23,6 +23,7 @@ def kwargs_build(request):
 
 @pytest.fixture(params=[
     (['default'], 'default'),
+    (['default'], 'copies'),
     (['back'], 'default'),
     (['back', 'combine'], 'default')
 ])
@@ -146,7 +147,7 @@ def test_cache(args_build: tuple[str, str]):
 
 
 def test_build_specific():
-    run(build, None, *prepare('default', *['missing']), **{'draft': ''})
+    run(build, None, *prepare('copies', *['default']), **{'draft': ''})
 
 
 temp = Path('./tests/input/temp')

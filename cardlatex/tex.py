@@ -100,7 +100,8 @@ class Tex:
                 except ValueError as e:
                     raise ValueError(f'{e}, ensure your .xlsx file contains a worksheet named \'cardlatex\'')
 
-                data_columns = pd.Index([*data_existing.columns] + [c for c in self._variables if c not in data_existing])
+                data_columns = pd.Index(
+                    [*data_existing.columns] + [c for c in self._variables if c not in data_existing])
                 data_existing = data_existing.reindex(columns=data_columns)
             else:
                 data_columns = pd.Index([*sorted(self._variables)])
@@ -133,13 +134,17 @@ class Tex:
 
         # \begin{tikzcard}[dpi]{width}{height}{
         tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n\n'
-        edges = [self._config.front]
-        if self.has_back:
-            edges.append(self._config.back)
+        edges = [self._config.front] + ([self._config.back] if self.has_back else [])
 
         content = []
         toggles = set()
         for row in range(len(data)) if build_all or self._config.include is None else self._config.include:
+            try:
+                copies = int(data['copies'][row])
+            except (KeyError, ValueError):
+                copies = 1
+
+            row_content = []
             for edge in edges:
                 edge_toggles = ['']
                 for key in self._variables:
@@ -155,7 +160,10 @@ class Tex:
                     edge = edge.replace(f'<${key}$>', str(value))
 
                 # any toggles, \begin{tikzcard}...{content}\end{tikzcard}
-                content.append('\n'.join(edge_toggles) + tikz + edge + '\n\\end{tikzcard}%\n')
+                row_content.append('\n'.join(edge_toggles) + tikz + edge + '\n\\end{tikzcard}%\n')
+
+            for c in range(copies):
+                content.extend(row_content)
 
         content = '\n'.join(content)
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
@@ -189,7 +197,7 @@ class Tex:
     def _xelatex(tex_file: Path, tex_log: Path, cache_log: Path):
         cmd = f'xelatex.exe -interaction=nonstopmode "{tex_file.stem}".tex'
         return subprocess.run(cmd, cwd=tex_file.parent,
-                                capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                              capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -278,12 +286,12 @@ class Tex:
             logging.error(xelatex_result)
             with open(cache_log, 'r') as f:
                 errors = re.finditer(r'(! .+)[\s\S]+?(l\.\d+ .+\n)[\s\S]+?\n\n', f.read())
-            errors = '\n'.join([f'{e.group(1)}\n{e.group(2)}' for e in errors])
+            errors = '\r\n'.join([f'{e.group(1)}\r\n\t{e.group(2)}' for e in errors])
             error_s = 'errors' if len(errors) > 1 else 'error'
 
             shutil.copy(cache_log, path_log)
             shutil.copy(cache_tex, path_tex)
-            raise subprocess.SubprocessError(f'{errors}\nXeLaTeX compilation {error_s}, see {path_log.resolve()}')
+            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}')
 
         self._completed = True
         return self

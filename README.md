@@ -170,6 +170,9 @@ The top row is reserved for the variable names used in your `.tex` templates wit
 Every subsequent row are the values of these placeholders. 
 These placeholders only work within the `\cardlatex[front]` and `\cardlatex[back]` configurations.
 
+If the header of a column is `copies`, it will create `n` copies (default 1, safety max of 100) of that row. 
+The column is still a valid variable as `<$copies$>` or `\if<$copies$>`. Invalid values are `n=1`.
+
 ## `cardlatex` command
 
 Compiles `.tex`/`.xlsx` file pairs in your terminal.
