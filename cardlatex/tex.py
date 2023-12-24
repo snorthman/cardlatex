@@ -279,19 +279,20 @@ class Tex:
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
 
-        if xelatex_result.returncode == 0 or (xelatex_result.stderr and len(xelatex_result.stderr) == 124):
-            # stderr may have a specific and irrelevant error
-            logging.info(xelatex_result)
-        else:
+        with open(cache_log, 'r') as f:
+            errors = [err.group().replace('\n', '\n\r') for err in
+                      re.finditer(r'! .+[\s\S]+?l\.(\d+) .+\n[\s\S]+?\n\n', f.read())]
+        if len(errors) > 0:
             logging.error(xelatex_result)
-            with open(cache_log, 'r') as f:
-                errors = re.finditer(r'(! .+)[\s\S]+?(l\.\d+ .+\n)[\s\S]+?\n\n', f.read())
-            errors = '\r\n'.join([f'{e.group(1)}\r\n\t{e.group(2)}' for e in errors])
             error_s = 'errors' if len(errors) > 1 else 'error'
 
             shutil.copy(cache_log, path_log)
             shutil.copy(cache_tex, path_tex)
-            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}')
+
+            errors = ''.join(errors)
+            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}\n\r')
+        else:
+            logging.info(xelatex_result)
 
         self._completed = True
         return self
