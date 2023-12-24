@@ -169,10 +169,10 @@ class Tex:
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
 
         graphicpaths = r"""
-            \makeatletter
-            \typeout{cardlatex@graphicpaths}
-            \typeout{\Ginput@path}
-            \makeatother
+\makeatletter
+\typeout{cardlatex@graphicpaths}
+\typeout{\Ginput@path}
+\makeatother
         """
 
         tex_blocks = [
@@ -194,10 +194,25 @@ class Tex:
         return tex
 
     @staticmethod
-    def _xelatex(tex_file: Path, tex_log: Path, cache_log: Path):
-        cmd = f'xelatex.exe -interaction=nonstopmode "{tex_file.stem}".tex'
-        return subprocess.run(cmd, cwd=tex_file.parent,
+    def _xelatex(path_log: Path, path_tex: Path, cache_log: Path, cache_tex: Path):
+        cmd = f'xelatex.exe -interaction=nonstopmode "{cache_tex.stem}".tex'
+        result = subprocess.run(cmd, cwd=cache_tex.parent,
                               capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+        with open(cache_log, 'r') as f:
+            errors = [err.group().replace('\n', '\n\r') for err in
+                      re.finditer(r'! .+[\s\S]+?l\.(\d+) .+\n[\s\S]+?\n\n', f.read())]
+        if len(errors) > 0:
+            logging.error(result)
+            error_s = 'errors' if len(errors) > 1 else 'error'
+
+            shutil.copy(cache_log, path_log)
+            shutil.copy(cache_tex, path_tex)
+
+            errors = ''.join(errors)
+            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}\n\r')
+        else:
+            logging.info(result)
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -214,6 +229,7 @@ class Tex:
         path_tex = self._path.with_suffix('.cardlatex.tex')
         cache_tex = self.cache_dir / self._path.name
         cache_log = cache_tex.with_suffix('.log')
+        xelatex_paths = (path_log, path_tex, cache_tex, cache_log)
 
         logging.info(f'{self._path}: resampled missing images')
         if kwargs.get('draft', False):
@@ -233,7 +249,7 @@ class Tex:
                             logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
-            xelatex_result = self._xelatex(cache_tex, path_log, cache_log)
+            self._xelatex(*xelatex_paths)
             with open(cache_log, 'r') as f:
                 log = f.read()
             logging.info(f'{self._path}: reading log contents at {cache_log}')
@@ -262,11 +278,11 @@ class Tex:
                     img.resample()
                 logging.info(f'{self._path}: resampled missing images')
 
-                xelatex_result = self._xelatex(cache_tex, path_log, cache_log)
+                self._xelatex(*xelatex_paths)
         else:
             with open(path_tex, 'w') as f:
                 f.write(tex)
-            xelatex_result = self._xelatex(path_tex, path_log, cache_log)
+            self._xelatex(*xelatex_paths)
 
             # delete, copy or move output to cache_dir to prepare for self.release()
             for suffix, action, args in [('.synctex.gz', os.remove, ()),
@@ -278,21 +294,6 @@ class Tex:
                 if path.exists():
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
-
-        with open(cache_log, 'r') as f:
-            errors = [err.group().replace('\n', '\n\r') for err in
-                      re.finditer(r'! .+[\s\S]+?l\.(\d+) .+\n[\s\S]+?\n\n', f.read())]
-        if len(errors) > 0:
-            logging.error(xelatex_result)
-            error_s = 'errors' if len(errors) > 1 else 'error'
-
-            shutil.copy(cache_log, path_log)
-            shutil.copy(cache_tex, path_tex)
-
-            errors = ''.join(errors)
-            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}\n\r')
-        else:
-            logging.info(xelatex_result)
 
         self._completed = True
         return self
