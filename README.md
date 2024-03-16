@@ -50,6 +50,12 @@ choco install cardlatex --source python
 choco install texstudio.install
 ```
 
+After installation, you can update using
+
+```commandline
+pip install cardlatex --upgrade
+```
+
 ## Example
 
 ```
