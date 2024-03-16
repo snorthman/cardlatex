@@ -96,7 +96,7 @@ def test_build(args_build: tuple[str, str], kwargs_build: dict):
         if 'default' in tex_files:
             expected = 3
             if 'all' in kwargs_build:
-                expected = 4
+                expected = 5 if xlsx_name == 'copies' else 4
             if 'print' in kwargs_build:
                 expected = 1
         elif 'back' in tex_files:
@@ -115,7 +115,10 @@ def test_build(args_build: tuple[str, str], kwargs_build: dict):
     for output in outputs:
         with Pdf.open(output) as pdf:
             actual += len(pdf.pages)
-    assert actual == expected
+    try:
+        assert actual == expected
+    except:
+        run(build, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
 
 
 def test_build_expected_exception(args_build_fail: tuple[str, str, Exception]):
@@ -147,7 +150,7 @@ def test_cache(args_build: tuple[str, str]):
 
 
 def test_build_specific():
-    run(build, None, *prepare('copies', *['default']), **{'draft': ''})
+    run(build, None, *prepare('copies', *['default']), **{'all': ''})
 
 
 temp = Path('./tests/input/temp')

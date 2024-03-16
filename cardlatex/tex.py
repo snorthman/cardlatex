@@ -196,23 +196,12 @@ class Tex:
     @staticmethod
     def _xelatex(path_log: Path, path_tex: Path, cache_log: Path, cache_tex: Path):
         cmd = f'xelatex.exe -interaction=nonstopmode "{cache_tex.stem}".tex'
-        result = subprocess.run(cmd, cwd=cache_tex.parent,
+        subprocess.run(cmd, cwd=cache_tex.parent,
                               capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
+        logging.info(f'{path_tex}: reading log contents at {cache_log}')
         with open(cache_log, 'r') as f:
-            errors = [err.group().replace('\n', '\n\r') for err in
-                      re.finditer(r'! .+[\s\S]+?l\.(\d+) .+\n[\s\S]+?\n\n', f.read())]
-        if len(errors) > 0:
-            logging.error(result)
-            error_s = 'errors' if len(errors) > 1 else 'error'
-
-            shutil.copy(cache_log, path_log)
-            shutil.copy(cache_tex, path_tex)
-
-            errors = ''.join(errors)
-            raise subprocess.SubprocessError(f'{errors}\r\nXeLaTeX compilation {error_s}, see {path_log.resolve()}\n\r')
-        else:
-            logging.info(result)
+            return f.read()
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -229,7 +218,15 @@ class Tex:
         path_tex = self._path.with_suffix('.cardlatex.tex')
         cache_tex = self.cache_dir / self._path.name
         cache_log = cache_tex.with_suffix('.log')
-        xelatex_paths = (path_log, path_tex, cache_tex, cache_log)
+
+        def xelatex(tex_path: Path = cache_tex, log_path: Path = cache_log):
+            cmd = f'xelatex.exe -interaction=nonstopmode "{tex_path.stem}".tex'
+            subprocess.run(cmd, cwd=tex_path.parent,
+                           capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+            logging.info(f'{path_tex}: reading log contents at {log_path}')
+            with open(log_path, 'r') as f:
+                return f.read()
 
         logging.info(f'{self._path}: resampled missing images')
         if kwargs.get('draft', False):
@@ -249,21 +246,21 @@ class Tex:
                             logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
-            self._xelatex(*xelatex_paths)
-            with open(cache_log, 'r') as f:
-                log = f.read()
-            logging.info(f'{self._path}: reading log contents at {cache_log}')
+            log = xelatex()
 
             # gather \graphicspath items from log
             base_path = self._path.parent
             graphicspaths = [base_path]
-            tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
-            for path in tex_graphicspaths[1:-1].split('}{'):
-                if is_relative(path):
-                    graphicspaths.append(base_path / path)
-            for path in graphicspaths:
-                if not path.is_relative_to(base_path):
-                    raise ValueError(f'{path} is not relative to the base directory {base_path}')
+            try:
+                tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
+                for path in tex_graphicspaths[1:-1].split('}{'):
+                    if is_relative(path):
+                        graphicspaths.append(base_path / path)
+                for path in graphicspaths:
+                    if not path.is_relative_to(base_path):
+                        raise ValueError(f'{path} is not relative to the base directory {base_path}')
+            except AttributeError:
+                pass  # no graphicspath other than base found
 
             # gather missing images from log
             not_found = []
@@ -278,11 +275,11 @@ class Tex:
                     img.resample()
                 logging.info(f'{self._path}: resampled missing images')
 
-                self._xelatex(*xelatex_paths)
+                log = xelatex()
         else:
             with open(path_tex, 'w') as f:
                 f.write(tex)
-            self._xelatex(*xelatex_paths)
+            log = xelatex(path_tex, path_tex.with_suffix('.log'))
 
             # delete, copy or move output to cache_dir to prepare for self.release()
             for suffix, action, args in [('.synctex.gz', os.remove, ()),
@@ -294,6 +291,12 @@ class Tex:
                 if path.exists():
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
+
+        errors = [m.group().strip('\n') for m in re.finditer(r'(?:! Undefined|! LaTeX Error).+?\n{2}', log, re.DOTALL)]
+        if len(errors) > 0:
+            shutil.copy(cache_log, path_log)
+            shutil.copy(cache_tex, path_tex)
+            raise subprocess.SubprocessError('\n\n'.join(errors) + f'\n\nXeLaTeX compilation error(s), see {path_log.resolve()}\n')
 
         self._completed = True
         return self
