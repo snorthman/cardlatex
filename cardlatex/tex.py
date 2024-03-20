@@ -292,7 +292,7 @@ class Tex:
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
 
-        errors = [m.group().strip('\n') for m in re.finditer(r'(?:! Undefined|! LaTeX Error).+?\n{2}', log, re.DOTALL)]
+        errors = [m.group().strip('\n') for m in re.finditer(r'(?:! Undefined|! LaTeX Error|! Package pgf.+\n).+?\n{2}', log, re.DOTALL)]
         if len(errors) > 0:
             shutil.copy(cache_log, path_log)
             shutil.copy(cache_tex, path_tex)
