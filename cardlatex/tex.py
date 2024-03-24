@@ -219,14 +219,29 @@ class Tex:
         cache_tex = self.cache_dir / self._path.name
         cache_log = cache_tex.with_suffix('.log')
 
-        def xelatex(tex_path: Path = cache_tex, log_path: Path = cache_log):
+        def xelatex(tex_path: Path = cache_tex):
             cmd = f'xelatex.exe -interaction=nonstopmode "{tex_path.stem}".tex'
             subprocess.run(cmd, cwd=tex_path.parent,
                            capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
+        errors_re = r'(?:! Undefined|! LaTeX Error|! Package .+? Error).+?\n{2}'
+
+        def xelatex_read_log(tex_path: Path = cache_tex, log_path: Path = cache_log, check_for_errors: bool = False):
             logging.info(f'{path_tex}: reading log contents at {log_path}')
             with open(log_path, 'r') as f:
-                return f.read()
+                output = f.read()
+
+            if check_for_errors:
+                errors = [m.group().strip('\n') for m in re.finditer(errors_re, output, re.DOTALL)]
+                if len(errors) > 0:
+                    shutil.copy(cache_log, path_log)
+                    shutil.copy(cache_tex, path_tex)
+                    raise subprocess.SubprocessError(
+                        '\n\n'.join(errors) + f'\n\nXeLaTeX compilation error(s), see {path_log.resolve()}\n')
+                if not tex_path.with_suffix('.pdf').exists():
+                    raise subprocess.SubprocessError(f'No pages of output. See {path_log} for unexpected errors.')
+
+            return output
 
         logging.info(f'{self._path}: resampled missing images')
         if kwargs.get('draft', False):
@@ -246,7 +261,8 @@ class Tex:
                             logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
-            log = xelatex()
+            xelatex()
+            log = xelatex_read_log(check_for_errors=False)
 
             # gather \graphicspath items from log
             base_path = self._path.parent
@@ -275,11 +291,13 @@ class Tex:
                     img.resample()
                 logging.info(f'{self._path}: resampled missing images')
 
-                log = xelatex()
+                xelatex()
+            xelatex_read_log(check_for_errors=True)
         else:
             with open(path_tex, 'w') as f:
                 f.write(tex)
-            log = xelatex(path_tex, path_tex.with_suffix('.log'))
+            xelatex(path_tex)
+            xelatex_read_log(path_tex, path_tex.with_suffix('.log'), check_for_errors=True)
 
             # delete, copy or move output to cache_dir to prepare for self.release()
             for suffix, action, args in [('.synctex.gz', os.remove, ()),
@@ -291,12 +309,6 @@ class Tex:
                 if path.exists():
                     action(*(path, *args))
             logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
-
-        errors = [m.group().strip('\n') for m in re.finditer(r'(?:! Undefined|! LaTeX Error|! Package pgf.+\n).+?\n{2}', log, re.DOTALL)]
-        if len(errors) > 0:
-            shutil.copy(cache_log, path_log)
-            shutil.copy(cache_tex, path_tex)
-            raise subprocess.SubprocessError('\n\n'.join(errors) + f'\n\nXeLaTeX compilation error(s), see {path_log.resolve()}\n')
 
         self._completed = True
         return self
