@@ -258,7 +258,9 @@ class Tex:
 
                 if not tex_path.with_suffix('.pdf').exists():
                     message.append(f'\nNo PDF built; no pages of output!')
-                raise subprocess.SubprocessError('\n'.join(message))
+
+                if len(message) > 1:
+                    raise subprocess.SubprocessError('\n'.join(message))
 
             return output
 
