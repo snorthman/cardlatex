@@ -133,8 +133,8 @@ class Tex:
         tex = prepare_inputs(self._tex, self._path.parent)
 
         # \begin{tikzcard}[dpi]{width}{height}{
-        tikz = '\n\\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}%\n\n'
-        edges = [self._config.front] + ([self._config.back] if self.has_back else [])
+        tikz = r'\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}'
+        texts = [self._config.front] + ([self._config.back] if self.has_back else [])
 
         content = []
         toggles = set()
@@ -145,22 +145,31 @@ class Tex:
                 copies = 1
 
             row_content = []
-            for edge in edges:
-                edge_toggles = ['']
+            for i, text in enumerate(texts):
+                text_toggles = ['']
                 for key in self._variables:
+                    line_replace = lambda t: t.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}').replace(f'<${key}$>', str(value))
                     item = data[key][row]
                     value = '' if pd.isna(item) else item
 
-                    if re.search(r'\\if<\$' + key + r'\$>', edge):
+                    if re.search(r'\\if<\$' + key + r'\$>', text):
                         # add any unique <$variables$> to 'toggles', in case we use \if<$variable$>
                         toggles.add(key)
-                        edge_toggles.append((r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}')
+                        text_toggles.append((r'\toggletrue{' if bool(value) else r'\togglefalse{') + key + '}')
 
-                    edge = edge.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}')
-                    edge = edge.replace(f'<${key}$>', str(value))
+                    text_lines = text.split('\n')
+                    text = []
+                    for line in text_lines:
+                        if m := re.search(r'(?:^|[^\\])(%).*', line):
+                            l, _ = m.span(1)
+                            text.append(line_replace(line[:l]) + line[l:])
+                        else:
+                            text.append(line_replace(line))
+                    text = '\n'.join(text)
 
                 # any toggles, \begin{tikzcard}...{content}\end{tikzcard}
-                row_content.append('\n'.join(edge_toggles) + tikz + edge + '\n\\end{tikzcard}%\n')
+                row_id = f'% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
+                row_content.append('\n'.join(text_toggles) + tikz + row_id + text + '\\end{tikzcard}%\n')
 
             for c in range(copies):
                 content.extend(row_content)
@@ -193,16 +202,6 @@ class Tex:
 
         return tex
 
-    @staticmethod
-    def _xelatex(path_log: Path, path_tex: Path, cache_log: Path, cache_tex: Path):
-        cmd = f'xelatex.exe -interaction=nonstopmode "{cache_tex.stem}".tex'
-        subprocess.run(cmd, cwd=cache_tex.parent,
-                              capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        logging.info(f'{path_tex}: reading log contents at {cache_log}')
-        with open(cache_log, 'r') as f:
-            return f.read()
-
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
             return self
@@ -221,10 +220,9 @@ class Tex:
 
         def xelatex(tex_path: Path = cache_tex):
             cmd = f'xelatex.exe -interaction=nonstopmode "{tex_path.stem}".tex'
-            subprocess.run(cmd, cwd=tex_path.parent,
-                           capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        errors_re = r'(?:! Undefined|! LaTeX Error|! Package .+? Error).+?\n{2}'
+            if (pdf_path := tex_path.with_suffix('.pdf')).exists():
+                os.remove(pdf_path)
+            subprocess.run(cmd, cwd=tex_path.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
         def xelatex_read_log(tex_path: Path = cache_tex, log_path: Path = cache_log, check_for_errors: bool = False):
             logging.info(f'{path_tex}: reading log contents at {log_path}')
@@ -232,14 +230,35 @@ class Tex:
                 output = f.read()
 
             if check_for_errors:
-                errors = [m.group().strip('\n') for m in re.finditer(errors_re, output, re.DOTALL)]
-                if len(errors) > 0:
+                message = [f'XeLaTeX compilation error(s), see {path_log.resolve()}.']
+                errors_with_lines = {m.span()[0]: m for m in re.finditer(r'! .*?l\.(\d+).*?\n{2}', output, re.DOTALL)}
+                errors_all = [m for m in re.finditer(r'! .*$', output, re.MULTILINE) if m.span()[0] not in errors_with_lines]
+
+                if len(errors_all) > 0 or len(errors_with_lines) > 0:
                     shutil.copy(cache_log, path_log)
                     shutil.copy(cache_tex, path_tex)
-                    raise subprocess.SubprocessError(
-                        '\n\n'.join(errors) + f'\n\nXeLaTeX compilation error(s), see {path_log.resolve()}\n')
+
+                    tex_content = self._tex.split('\n')
+                    with open(tex_path) as f:
+                        tex_path_content = f.read().split('\n')
+                    line_row = {l: (match.group(1), match.group(2).lower()) for match, l in [(re.search(r'\\begin{tikzcard}.*% ROW (\d+) (FRONT|BACK)', line), l) for l, line in enumerate(tex_path_content)] if match}
+
+                    for em in errors_with_lines.values():
+                        error_line = int(em.group(1))
+                        error_row = [key for key in line_row.keys() if key - error_line <= 0][-1]
+                        row_id, edge = line_row[error_row]
+                        tex_edge_line = [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][-1]
+                        tex_line = tex_edge_line + error_line - error_row - 3
+                        tex_path_line = error_line - 3
+
+                        message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})', '>> ' + tex_content[tex_line - 1].strip('\t'), '>> ' + tex_path_content[tex_path_line].strip('\t')])
+                        
+                    for em in errors_all:
+                        message.append('\n' + em.group())
+
                 if not tex_path.with_suffix('.pdf').exists():
-                    raise subprocess.SubprocessError(f'No pages of output. See {path_log} for unexpected errors.')
+                    message.append(f'\nNo PDF built; no pages of output!')
+                raise subprocess.SubprocessError('\n'.join(message))
 
             return output
 

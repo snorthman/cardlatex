@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = '0.5.5'
+version = '0.5.6'
 
 if __name__ == '__main__':
     setup(
