@@ -58,7 +58,7 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, dr
             exit(1)
     finally:
         end = datetime.now() - start
-        print(f'cardlatex ran for {end}')
+        print(f'cardlatex v{version} ran for {end}')
         logging.info(f'process ended in {end}')
 
 

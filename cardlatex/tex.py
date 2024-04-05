@@ -136,6 +136,9 @@ class Tex:
         tikz = r'\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}'
         texts = [self._config.front] + ([self._config.back] if self.has_back else [])
 
+        if len(data) == 0:
+            data = pd.DataFrame(index=[None], columns=[None])
+
         content = []
         toggles = set()
         for row in range(len(data)) if build_all or self._config.include is None else self._config.include:
@@ -245,13 +248,16 @@ class Tex:
 
                     for em in errors_with_lines.values():
                         error_line = int(em.group(1))
-                        error_row = [key for key in line_row.keys() if key - error_line <= 0][-1]
-                        row_id, edge = line_row[error_row]
-                        tex_edge_line = [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][-1]
-                        tex_line = tex_edge_line + error_line - error_row - 3
-                        tex_path_line = error_line - 3
+                        if error_line < min(line_row.keys()):
+                            message.append('\n' + em.group())
+                        else:
+                            error_row = [key for key in line_row.keys() if key - error_line <= 0][-1]
+                            row_id, edge = line_row[error_row]
+                            tex_edge_line = [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][-1]
+                            tex_line = tex_edge_line + error_line - error_row - 3
+                            tex_path_line = error_line - 3
 
-                        message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})', '>> ' + tex_content[tex_line - 1].strip('\t'), '>> ' + tex_path_content[tex_path_line].strip('\t')])
+                            message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})', '>> ' + tex_content[tex_line - 1].strip('\t'), '>> ' + tex_path_content[tex_path_line].strip('\t')])
                         
                     for em in errors_all:
                         message.append('\n' + em.group())
