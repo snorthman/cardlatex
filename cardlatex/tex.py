@@ -151,7 +151,6 @@ class Tex:
             for i, text in enumerate(texts):
                 text_toggles = ['']
                 for key in self._variables:
-                    line_replace = lambda t: t.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}').replace(f'<${key}$>', str(value))
                     item = data[key][row]
                     value = '' if pd.isna(item) else item
 
@@ -162,6 +161,7 @@ class Tex:
 
                     text_lines = text.split('\n')
                     text = []
+                    line_replace = lambda t: t.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}').replace(f'<${key}$>', str(value))
                     for line in text_lines:
                         if m := re.search(r'(?:^|[^\\])(%).*', line):
                             l, _ = m.span(1)
@@ -288,37 +288,40 @@ class Tex:
                             logging.error(f'{self._path}: {e}')
             logging.info(f'{self._path}: resampled existing images')
 
-            xelatex()
-            log = xelatex_read_log(check_for_errors=False)
-
-            # gather \graphicspath items from log
-            base_path = self._path.parent
-            graphicspaths = [base_path]
-            try:
-                tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
-                for path in tex_graphicspaths[1:-1].split('}{'):
-                    if is_relative(path):
-                        graphicspaths.append(base_path / path)
-                for path in graphicspaths:
-                    if not path.is_relative_to(base_path):
-                        raise ValueError(f'{path} is not relative to the base directory {base_path}')
-            except AttributeError:
-                pass  # no graphicspath other than base found
-
-            # gather missing images from log
-            not_found = []
-            for pattern in [r'! LaTeX Error: File `(.+)\' not found', r'LaTeX Warning: File `(.+)\' not found']:
-                not_found.extend(r.group(1) for r in re.finditer(pattern, log))
-
-            # resample missing images
-            if not_found:
-                for file in not_found:
-                    img = Image(self._path.parent, self.cache_dir)
-                    img.find_source_from_directories(file, *graphicspaths)
-                    img.resample()
-                logging.info(f'{self._path}: resampled missing images')
-
+            while True:
                 xelatex()
+                log = xelatex_read_log(check_for_errors=False)
+
+                # gather \graphicspath items from log
+                base_path = self._path.parent
+                graphicspaths = [base_path]
+                try:
+                    tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
+                    for path in tex_graphicspaths[1:-1].split('}{'):
+                        if is_relative(path):
+                            graphicspaths.append(base_path / path)
+                    for path in graphicspaths:
+                        if not path.is_relative_to(base_path):
+                            raise ValueError(f'{path} is not relative to the base directory {base_path}')
+                except AttributeError:
+                    pass  # no graphicspath other than base found
+
+                # gather missing images from log
+                not_found = []
+                for pattern in [r'! LaTeX Error: File `(.+)\' not found', r'LaTeX Warning: File `(.+)\' not found']:
+                    not_found.extend(r.group(1) for r in re.finditer(pattern, log))
+                not_found = set(not_found)
+
+                # resample missing images
+                if not_found:
+                    print(f'resampling missing images: {not_found}')
+                    for file in not_found:
+                        img = Image(self._path.parent, self.cache_dir)
+                        img.find_source_from_directories(file, *graphicspaths)
+                        img.resample()
+                    logging.info(f'{self._path}: resampled missing images')
+                else:
+                    break
             xelatex_read_log(check_for_errors=True)
         else:
             with open(path_tex, 'w') as f:
