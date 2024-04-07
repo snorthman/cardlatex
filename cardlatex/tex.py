@@ -203,7 +203,10 @@ class Tex:
                 tex += '\n\n' + '%' * 68 + '\n% ' + header.upper() + '\n\n'
             tex += block
 
-        return tex
+        tex_draft = tex.split('\n')
+        tex_draft.insert(1, r'\usepackage[draft]{graphicx}')
+
+        return tex, '\n'.join(tex_draft)
 
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
@@ -213,7 +216,7 @@ class Tex:
 
         data = self._load_or_generate_xlsx()
         logging.info(f'{self._path}: xlsx loaded:\n\n{data.to_string()}\n')
-        tex = self._prepare_tex(data, **kwargs)
+        tex, tex_draft = self._prepare_tex(data, **kwargs)
         logging.info(f'{self._path}: tex content:\n\n{tex}\n')
 
         path_log = self._path.with_suffix('.log')
@@ -273,8 +276,8 @@ class Tex:
         logging.info(f'{self._path}: resampled missing images')
         if kwargs.get('draft', False):
             with open(cache_tex, 'w') as f:
-                f.write(tex)
-            logging.info(f'{self._path}: wrote tex contents to {cache_tex}')
+                f.write(tex_draft)
+            logging.info(f'{self._path}: wrote draft tex contents to {cache_tex}')
 
             # resample existing images
             for directory, _, filenames in os.walk(self._cache_dir):
@@ -322,6 +325,10 @@ class Tex:
                     logging.info(f'{self._path}: resampled missing images')
                 else:
                     break
+            with open(cache_tex, 'w') as f:
+                f.write(tex)
+            xelatex()
+            logging.info(f'{self._path}: wrote tex contents to {cache_tex}')
             xelatex_read_log(check_for_errors=True)
         else:
             with open(path_tex, 'w') as f:
