@@ -8,6 +8,9 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pexpect.popen_spawn
+import pexpect
+from wand.image import Image as WandImage
 
 from . import tempdir
 from .config import Config
@@ -123,6 +126,12 @@ class Tex:
         else:
             return pd.DataFrame()
 
+    def path(self, suffix: str = None, cache: bool = False):
+        if suffix:
+            return (self.cache_dir / self._path.name).with_suffix(suffix) if cache else self._path.with_suffix(suffix)
+        else:
+            return self.cache_dir if cache else self._path.parent
+
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
         """
         Prepare contents of the cardlatex.tex document
@@ -208,6 +217,48 @@ class Tex:
 
         return tex, '\n'.join(tex_draft)
 
+    def _xelatex(self, tex_path: Path):
+        draft = tex_path.is_relative_to(self.cache_dir)
+        cmd = f'xelatex.exe -interaction=errorstopmode "{tex_path.stem}".tex'
+        if (pdf_path := tex_path.with_suffix('.pdf')).exists():
+            os.remove(pdf_path)
+
+        if os.name == 'nt':
+            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=tex_path.parent.as_posix())
+        else:
+            process = pexpect.spawn(cmd, cwd=tex_path.parent.as_posix())
+
+        process.expect(r'cardlatex@graphicpaths\r\n(.*)\r')
+        directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group(1).decode())]
+
+        while process.expect(r'includegraphics@(.+?)\r') == 0:
+            fn: str = process.match.group(1).decode()
+
+            files = [self.path() / path / fn for path in directories]
+            exists = [path.exists() for path in files]
+            if any(exists):
+                if draft:
+                    file = files[file_index := exists.index(True)]
+                    file_draft = [self.path(cache=True) / path / fn for path in directories][file_index]
+
+                    if not file_draft.exists():
+                        self._resample(file, file_draft)
+                    else:
+                        if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
+                            self._resample(file, file_draft)
+
+            process.sendline('\r\n')
+
+    @staticmethod
+    def _resample(source: Path, target: Path):
+        lstat = source.lstat()
+        with WandImage(filename=source.as_posix()) as src:
+            with src.convert(source.suffix[1:]) as tar:
+                if lstat.st_size > 0 and lstat.st_size > 51200:  # in bytes
+                    tar.transform(resize=f'{round(100 * 51200 / lstat.st_size)}%')
+                tar.save(filename=target.as_posix())
+        os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
+
     def build(self, **kwargs) -> 'Tex':
         if self.completed:
             return self
@@ -228,7 +279,8 @@ class Tex:
             cmd = f'xelatex.exe -interaction=nonstopmode "{tex_path.stem}".tex'
             if (pdf_path := tex_path.with_suffix('.pdf')).exists():
                 os.remove(pdf_path)
-            subprocess.run(cmd, cwd=tex_path.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            self._xelatex(tex_path)
+            #subprocess.run(cmd, cwd=tex_path.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
         def xelatex_read_log(tex_path: Path = cache_tex, log_path: Path = cache_log, check_for_errors: bool = False):
             logging.info(f'{path_tex}: reading log contents at {log_path}')

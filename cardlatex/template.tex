@@ -19,6 +19,8 @@
 \usetikzlibrary{arrows.meta,math,calc,scopes,fadings,backgrounds}
 %\usepgflibrary{fpu}
 \graphicspath{{}}
+\let\includegraphicstypein\includegraphics
+\renewcommand{\includegraphics}[2][]{\typein{includegraphics@#2}\includegraphicstypein[#1]{#2}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TIKZ
