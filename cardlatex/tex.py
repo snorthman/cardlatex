@@ -231,23 +231,28 @@ class Tex:
         process.expect(r'cardlatex@graphicpaths\r\n(.*)\r')
         directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group(1).decode())]
 
-        while process.expect(r'includegraphics@(.+?)\r') == 0:
-            fn: str = process.match.group(1).decode()
+        try:
+            while process.expect(r'includegraphics@(.+?)\r') == 0:
+                fn: str = process.match.group(1).decode()
 
-            files = [self.path() / path / fn for path in directories]
-            exists = [path.exists() for path in files]
-            if any(exists):
-                if draft:
-                    file = files[file_index := exists.index(True)]
-                    file_draft = [self.path(cache=True) / path / fn for path in directories][file_index]
+                files = [self.path() / path / fn for path in directories]
+                exists = [path.exists() for path in files]
+                if any(exists):
+                    if draft:
+                        file = files[file_index := exists.index(True)]
+                        file_draft = [self.path(cache=True) / path / fn for path in directories][file_index]
 
-                    if not file_draft.exists():
-                        self._resample(file, file_draft)
-                    else:
-                        if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
+                        if not file_draft.exists():
                             self._resample(file, file_draft)
+                        else:
+                            if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
+                                self._resample(file, file_draft)
 
-            process.sendline('\r\n')
+                process.sendline('\r\n')
+        except pexpect.TIMEOUT:
+            pass
+        except pexpect.EOF:
+            pass
 
     @staticmethod
     def _resample(source: Path, target: Path):
