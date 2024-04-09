@@ -19,7 +19,8 @@ if __name__ == '__main__':
             'openpyxl',
             'pandas',
             'wand',
-            'pikepdf'
+            'pikepdf',
+            'pexpect'
         ],
         extras_require={
             'dev': [

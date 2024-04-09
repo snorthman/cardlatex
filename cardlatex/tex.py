@@ -170,7 +170,8 @@ class Tex:
 
                     text_lines = text.split('\n')
                     text = []
-                    line_replace = lambda t: t.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}').replace(f'<${key}$>', str(value))
+                    line_replace = lambda t: t.replace(f'\\if<${key}$>', r'\ifvar{' + key + '}').replace(f'<${key}$>',
+                                                                                                         str(value))
                     for line in text_lines:
                         if m := re.search(r'(?:^|[^\\])(%).*', line):
                             l, _ = m.span(1)
@@ -181,7 +182,7 @@ class Tex:
 
                 # any toggles, \begin{tikzcard}...{content}\end{tikzcard}
                 row_id = f'% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
-                row_content.append('\n'.join(text_toggles) + tikz + row_id + text + '\\end{tikzcard}%\n')
+                row_content.append('\n'.join(text_toggles) + row_id + tikz + text + '\\end{tikzcard}%\n')
 
             for c in range(copies):
                 content.extend(row_content)
@@ -201,6 +202,7 @@ class Tex:
             ('user tex input', tex),
             ('newtoggles', toggles),
             ('graphicspaths', graphicpaths),
+            ('error', '...'),
             ('document', '\\begin{document}\n'),
             (None, content.replace('\n', '\n\t')),
             (None, '\n\\end{document}')
@@ -212,43 +214,54 @@ class Tex:
                 tex += '\n\n' + '%' * 68 + '\n% ' + header.upper() + '\n\n'
             tex += block
 
-        tex_draft = tex.split('\n')
-        tex_draft.insert(1, r'\usepackage[draft]{graphicx}')
+        return tex
 
-        return tex, '\n'.join(tex_draft)
-
-    def _xelatex(self, tex_path: Path):
+    def _xelatex(self, tex_path: Path, tex: str):
         draft = tex_path.is_relative_to(self.cache_dir)
-        cmd = f'xelatex.exe -interaction=errorstopmode "{tex_path.stem}".tex'
+        with open(tex_path, 'w') as t:
+            t.write(tex)
+        _tex = ('\n' + tex).split('\n')
+        with open(self.path('.tex')) as t:
+            _cardtex = ['\n'] + t.readlines()
+
+        cmd = f'xelatex.exe -interaction=errorstopmode -8bit -file-line-error "{tex_path.stem}".tex 2&>1'
         if (pdf_path := tex_path.with_suffix('.pdf')).exists():
             os.remove(pdf_path)
 
-        if os.name == 'nt':
-            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=tex_path.parent.as_posix())
-        else:
-            process = pexpect.spawn(cmd, cwd=tex_path.parent.as_posix())
-
-        process.expect(r'cardlatex@graphicpaths\r\n(.*)\r')
-        directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group(1).decode())]
-
         try:
-            while process.expect(r'includegraphics@(.+?)\r') == 0:
-                fn: str = process.match.group(1).decode()
+            directories = None
+            if os.name == 'nt':
+                process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=tex_path.parent.as_posix())
+            else:
+                process = pexpect.spawn(cmd, cwd=tex_path.parent.as_posix())
 
-                files = [self.path() / path / fn for path in directories]
-                exists = [path.exists() for path in files]
-                if any(exists):
-                    if draft:
-                        file = files[file_index := exists.index(True)]
-                        file_draft = [self.path(cache=True) / path / fn for path in directories][file_index]
+            while True:  #process.expect_list([r'includegraphics@(.+?)\r', tex_path.name + r':\d+']) >= 0:
+                p = process.expect([r'includegraphics@(.+?)\r', tex_path.name.replace('.', r'\.') + r':(\d+):(.*?)\r'])
+                if directories is None:
+                    graphicpaths = re.search(r'cardlatex@graphicpaths\r\n(.*)\r', process.before.decode())
+                    if graphicpaths:
+                        directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', graphicpaths.group(1))]
+                if p == 0:
+                    assert directories is not None
 
-                        if not file_draft.exists():
-                            self._resample(file, file_draft)
-                        else:
-                            if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
+                    fn: str = process.match.group(1).decode()
+                    files = [self.path() / path / fn for path in directories]
+                    exists = [path.exists() for path in files]
+                    if any(exists):
+                        if draft:
+                            file = files[file_index := exists.index(True)]
+                            file_draft = [self.path(cache=True) / path / fn for path in directories][file_index]
+
+                            if not file_draft.exists():
                                 self._resample(file, file_draft)
+                            else:
+                                if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
+                                    self._resample(file, file_draft)
 
-                process.sendline('\r\n')
+                    process.sendline('\r\n')
+                else:
+                    ln, err = int(process.match.group(1)), process.match.group(2).decode()
+                    pass  # do line print error handling; \begin{tikzcard}[dpi]{width}{height}{\nfront/back}
         except pexpect.TIMEOUT:
             pass
         except pexpect.EOF:
@@ -257,10 +270,11 @@ class Tex:
     @staticmethod
     def _resample(source: Path, target: Path):
         lstat = source.lstat()
-        with WandImage(filename=source.as_posix()) as src:
+        with WandImage(filename=source.resolve().as_posix()) as src:
             with src.convert(source.suffix[1:]) as tar:
                 if lstat.st_size > 0 and lstat.st_size > 51200:  # in bytes
                     tar.transform(resize=f'{round(100 * 51200 / lstat.st_size)}%')
+                target.parent.mkdir(parents=True, exist_ok=True)
                 tar.save(filename=target.as_posix())
         os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
 
@@ -272,8 +286,10 @@ class Tex:
 
         data = self._load_or_generate_xlsx()
         logging.info(f'{self._path}: xlsx loaded:\n\n{data.to_string()}\n')
-        tex, tex_draft = self._prepare_tex(data, **kwargs)
+        tex = self._prepare_tex(data, **kwargs)
         logging.info(f'{self._path}: tex content:\n\n{tex}\n')
+
+        self._xelatex(self.path('.cardlatex.tex', cache=kwargs.get('draft')), tex)
 
         path_log = self._path.with_suffix('.log')
         path_tex = self._path.with_suffix('.cardlatex.tex')
@@ -295,7 +311,8 @@ class Tex:
             if check_for_errors:
                 message = [f'XeLaTeX compilation error(s), see {path_log.resolve()}.']
                 errors_with_lines = {m.span()[0]: m for m in re.finditer(r'! .*?l\.(\d+).*?\n{2}', output, re.DOTALL)}
-                errors_all = [m for m in re.finditer(r'! .*$', output, re.MULTILINE) if m.span()[0] not in errors_with_lines]
+                errors_all = [m for m in re.finditer(r'! .*$', output, re.MULTILINE) if
+                              m.span()[0] not in errors_with_lines]
 
                 if len(errors_all) > 0 or len(errors_with_lines) > 0:
                     shutil.copy(cache_log, path_log)
@@ -304,7 +321,9 @@ class Tex:
                     tex_content = self._tex.split('\n')
                     with open(tex_path) as f:
                         tex_path_content = f.read().split('\n')
-                    line_row = {l: (match.group(1), match.group(2).lower()) for match, l in [(re.search(r'\\begin{tikzcard}.*% ROW (\d+) (FRONT|BACK)', line), l) for l, line in enumerate(tex_path_content)] if match}
+                    line_row = {l: (match.group(1), match.group(2).lower()) for match, l in
+                                [(re.search(r'\\begin{tikzcard}.*% ROW (\d+) (FRONT|BACK)', line), l) for l, line in
+                                 enumerate(tex_path_content)] if match}
 
                     for em in errors_with_lines.values():
                         error_line = int(em.group(1))
@@ -313,12 +332,16 @@ class Tex:
                         else:
                             error_row = [key for key in line_row.keys() if key - error_line <= 0][-1]
                             row_id, edge = line_row[error_row]
-                            tex_edge_line = [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][-1]
+                            tex_edge_line = \
+                            [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][
+                                -1]
                             tex_line = tex_edge_line + error_line - error_row - 3
                             tex_path_line = error_line - 3
 
-                            message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})', '>> ' + tex_content[tex_line - 1].strip('\t'), '>> ' + tex_path_content[tex_path_line].strip('\t')])
-                        
+                            message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})',
+                                            '>> ' + tex_content[tex_line - 1].strip('\t'),
+                                            '>> ' + tex_path_content[tex_path_line].strip('\t')])
+
                     for em in errors_all:
                         message.append('\n' + em.group())
 
