@@ -40,15 +40,16 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, dr
         builds: list[Tex] = [Tex(path).build(**kwargs) for path in tex]
 
         if paper:
-            [grid_pdf(b.output, b.has_back) for b in builds]
+            [grid_pdf(b.build_pdf_path, b.has_back) for b in builds]
 
         if combine and len(builds) > 1:
             if not all([b.completed for b in builds]):
                 raise RuntimeError('Not all .tex files have succesfully compiled.')
-            combine_pdf(*[b.output for b in builds])
+            combine_pdf(*[b.build_pdf_path for b in builds])
             builds[0].release()
         else:
-            [b.release() for b in builds]
+            for b in builds:
+                b.release()
     except Exception as e:
         print(e, file=sys.stderr)
         logging.exception(e)

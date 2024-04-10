@@ -3,18 +3,16 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pexpect.popen_spawn
 import pexpect
+import pexpect.popen_spawn
 from wand.image import Image as WandImage
 
 from . import tempdir
 from .config import Config
-from .image import Image, is_relative
 from .template import template as template_tex
 
 
@@ -53,6 +51,7 @@ def prepare_inputs(tex: str, tex_dir: Path):
 class Tex:
     def __init__(self, tex: Path | str):
         self._path = Path(tex)
+        self._cache_dir = self.get_cache_dir(self._path)
         self._template = self.template()
 
         with open(self._path, 'r') as f:
@@ -61,8 +60,6 @@ class Tex:
         self._config = Config(self._tex)
         self._variables = sorted(
             list(({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', self._config.front + self._config.back)})))
-        self._cache_dir = self.get_cache_dir(self._path)
-        self._cache_output_pdf = (self.cache_dir / self._path.name).with_suffix('.pdf')
         self._completed = False
 
     @staticmethod
@@ -79,20 +76,22 @@ class Tex:
         return tempdir / sha256(Path(tex).resolve().as_posix())
 
     @property
-    def cache_dir(self) -> Path:
-        return self._cache_dir
-
-    @property
     def has_back(self) -> bool:
         return 'back' in self._config
 
     @property
-    def output(self) -> Path:
-        return self._cache_output_pdf
+    def build_pdf_path(self) -> Path:
+        return self.path('.pdf', cache=True)
 
     @property
     def completed(self) -> bool:
         return self._completed
+
+    def path(self, suffix: str = None, cache: bool = False):
+        if suffix:
+            return (self._cache_dir / self._path.name).with_suffix(suffix) if cache else self._path.with_suffix(suffix)
+        else:
+            return self._cache_dir if cache else self._path.parent
 
     def _load_or_generate_xlsx(self):
         if self._variables:
@@ -125,12 +124,6 @@ class Tex:
             return data_existing
         else:
             return pd.DataFrame()
-
-    def path(self, suffix: str = None, cache: bool = False):
-        if suffix:
-            return (self.cache_dir / self._path.name).with_suffix(suffix) if cache else self._path.with_suffix(suffix)
-        else:
-            return self.cache_dir if cache else self._path.parent
 
     def _prepare_tex(self, data: pd.DataFrame, **kwargs):
         """
@@ -180,8 +173,7 @@ class Tex:
                             text.append(line_replace(line))
                     text = '\n'.join(text)
 
-                # any toggles, \begin{tikzcard}...{content}\end{tikzcard}
-                row_id = f'% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
+                row_id = f'\n% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
                 row_content.append('\n'.join(text_toggles) + row_id + tikz + text + '\\end{tikzcard}%\n')
 
             for c in range(copies):
@@ -191,10 +183,8 @@ class Tex:
         toggles = '\n'.join([r'\newtoggle{' + value + '}' for value in toggles])
 
         graphicpaths = r"""
-\makeatletter
 \typeout{cardlatex@graphicpaths}
-\typeout{\Ginput@path}
-\makeatother
+\makeatletter\typein{\Ginput@path}\makeatother
         """
 
         tex_blocks = [
@@ -202,7 +192,6 @@ class Tex:
             ('user tex input', tex),
             ('newtoggles', toggles),
             ('graphicspaths', graphicpaths),
-            ('error', '...'),
             ('document', '\\begin{document}\n'),
             (None, content.replace('\n', '\n\t')),
             (None, '\n\\end{document}')
@@ -216,32 +205,51 @@ class Tex:
 
         return tex
 
-    def _xelatex(self, tex_path: Path, tex: str):
-        draft = tex_path.is_relative_to(self.cache_dir)
-        with open(tex_path, 'w') as t:
-            t.write(tex)
-        _tex = ('\n' + tex).split('\n')
-        with open(self.path('.tex')) as t:
-            _cardtex = ['\n'] + t.readlines()
+    def _xelatex(self, cardtex_path: Path, tex: str):
+        draft = cardtex_path.is_relative_to(self._cache_dir)
 
-        cmd = f'xelatex.exe -interaction=errorstopmode -8bit -file-line-error "{tex_path.stem}".tex 2&>1'
-        if (pdf_path := tex_path.with_suffix('.pdf')).exists():
+        with open(cardtex_path, 'w') as t:
+            t.write(tex)
+        _tex_ = ('\n' + tex).split('\n')
+
+        with open(self.path('.tex')) as t:
+            cardtex = t.read()
+        _cardtex_ = ('\n' + cardtex).split('\n')
+
+        ln_ww = max([len(str(len(x))) for x in [_cardtex_, _tex_]])
+        ln_w = lambda l: str(l).ljust(ln_ww, ' ')
+
+        cardtex_fb = {}
+        for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', cardtex, re.MULTILINE):
+            cardtex_fb[m.group(1)] = len(cardtex[:m.end()].split('\n'))
+
+        cardtex_rows: list[tuple[int, str | None, str | None]] = [(0, 'preamble', None)]
+        for m in re.finditer(r'% ROW (\d+) (FRONT|BACK)\n', tex):
+            cardtex_rows.append((len(tex[:m.end()].split('\n')), f'row {m.group(1)}', m.group(2).lower()))
+        cardtex_rows.append((len(_tex_) + 1, None, None))
+
+        if (pdf_path := cardtex_path.with_suffix('.pdf')).exists():
             os.remove(pdf_path)
+        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{cardtex_path.stem}".tex 2&>1'
+        print(f'running XeLaTeX on {self.path(".tex")} ({cmd})')
 
         try:
             directories = None
+            errors = 0
+            expects = [r'cardlatex@graphicpaths\r\n(.*?)\r',
+                       r'includegraphics@(.+?)\r',
+                       cardtex_path.name.replace('.', r'\.') + r':(\d+):(.*)l\.\1',
+                       pexpect.EOF]
             if os.name == 'nt':
-                process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=tex_path.parent.as_posix())
+                process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cardtex_path.parent.as_posix())
             else:
-                process = pexpect.spawn(cmd, cwd=tex_path.parent.as_posix())
+                process = pexpect.spawn(cmd, cwd=cardtex_path.parent.as_posix(), echo=False)
 
-            while True:  #process.expect_list([r'includegraphics@(.+?)\r', tex_path.name + r':\d+']) >= 0:
-                p = process.expect([r'includegraphics@(.+?)\r', tex_path.name.replace('.', r'\.') + r':(\d+):(.*?)\r'])
-                if directories is None:
-                    graphicpaths = re.search(r'cardlatex@graphicpaths\r\n(.*)\r', process.before.decode())
-                    if graphicpaths:
-                        directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', graphicpaths.group(1))]
-                if p == 0:
+            while True:
+                p = process.expect(expects)
+                if p == 0:  # r'cardlatex@graphicpaths\r\n(.*?)\r'
+                    directories = [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group().decode())]
+                if p == 1:  # r'includegraphics@(.+?)\r'
                     assert directories is not None
 
                     fn: str = process.match.group(1).decode()
@@ -257,15 +265,69 @@ class Tex:
                             else:
                                 if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
                                     self._resample(file, file_draft)
+                if p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
+                    ln, err = int(process.match.group(1)), process.match.group(2).decode().strip('\r\n ')
+                    ln_row, loc, fb = cardtex_rows[[ln >= r for r, _, _ in cardtex_rows].index(False) - 1]
+                    if fb is None:
+                        print('\n\t'.join([f'Error in preamble',
+                                           f'\n\tln. {ln} of compiled',
+                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           '\n\tTeX error message was',
+                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                    else:
+                        ln_cardtex = cardtex_fb[fb] + ln - ln_row
+                        print('\n\t'.join([f'Error in {loc} [{fb}]',
+                                           f'\n\tln. {ln_cardtex} of template',
+                                           *[ln_w(l) + ' >> ' + _cardtex_[l] for l in
+                                             range(ln_cardtex - 2, ln_cardtex + 3)],
+                                           f'\n\tln. {ln} of compiled',
+                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           f'\n\tTeX error message was',
+                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                    errors += 1
+                if p == 3:  # EOF
+                    with open(log_path := cardtex_path.with_suffix('.log')) as f:
+                        log = f.read()
 
-                    process.sendline('\r\n')
-                else:
-                    ln, err = int(process.match.group(1)), process.match.group(2).decode()
-                    pass  # do line print error handling; \begin{tikzcard}[dpi]{width}{height}{\nfront/back}
-        except pexpect.TIMEOUT:
-            pass
-        except pexpect.EOF:
-            pass
+                    names = ['.cardlatex.log', '.cardlatex.tex']
+                    if errors == 0:
+                        for name in names:
+                            if (path := self.path(name)).exists():
+                                os.remove(path)
+
+                        shutil.move(cardtex_path.with_suffix('.pdf'), self.path('.pdf', cache=True))
+                        m = re.search(r'Output written on (.+)pdf \((\d+)', log)
+                        print(self.path('.tex').name + f' completed! ({m.group(2)} pages)')
+                    else:
+                        for path, name in zip([log_path, cardtex_path], names):
+                            shutil.copy(path, self.path(name))
+
+                        print(self.path('.tex').name + f' failed! ({errors} error{"s" if errors > 1 else ""})')
+                    return 0 if errors == 0 else 1
+
+                process.sendline('')
+        except pexpect.TIMEOUT as e:
+            raise e
+        except Exception as e:
+            raise e
+
+    def build(self, **kwargs) -> 'Tex':
+        if not self.completed:
+            self._cache_dir.mkdir(exist_ok=True, parents=True)
+            data = self._load_or_generate_xlsx()
+            logging.info(f'{self._path}: xlsx loaded:\n\n{data.to_string()}\n')
+            tex = self._prepare_tex(data, **kwargs)
+            logging.info(f'{self._path}: tex content:\n\n{tex}\n')
+            exitcode = self._xelatex(self.path('.cardlatex.tex', cache=kwargs.get('draft')), tex)
+            self._completed = exitcode == 0
+            logging.info(f'{self._path}: xelatex exitcode {exitcode}\n')
+
+        return self
+
+    def release(self):
+        if self.completed:
+            shutil.move(self.path('.pdf', cache=True), self.path('.pdf'))
+            logging.info(f'{self._path}: released')
 
     @staticmethod
     def _resample(source: Path, target: Path):
@@ -277,171 +339,3 @@ class Tex:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tar.save(filename=target.as_posix())
         os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
-
-    def build(self, **kwargs) -> 'Tex':
-        if self.completed:
-            return self
-
-        self.cache_dir.mkdir(exist_ok=True, parents=True)
-
-        data = self._load_or_generate_xlsx()
-        logging.info(f'{self._path}: xlsx loaded:\n\n{data.to_string()}\n')
-        tex = self._prepare_tex(data, **kwargs)
-        logging.info(f'{self._path}: tex content:\n\n{tex}\n')
-
-        self._xelatex(self.path('.cardlatex.tex', cache=kwargs.get('draft')), tex)
-
-        path_log = self._path.with_suffix('.log')
-        path_tex = self._path.with_suffix('.cardlatex.tex')
-        cache_tex = self.cache_dir / self._path.name
-        cache_log = cache_tex.with_suffix('.log')
-
-        def xelatex(tex_path: Path = cache_tex):
-            cmd = f'xelatex.exe -interaction=nonstopmode "{tex_path.stem}".tex'
-            if (pdf_path := tex_path.with_suffix('.pdf')).exists():
-                os.remove(pdf_path)
-            self._xelatex(tex_path)
-            #subprocess.run(cmd, cwd=tex_path.parent, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        def xelatex_read_log(tex_path: Path = cache_tex, log_path: Path = cache_log, check_for_errors: bool = False):
-            logging.info(f'{path_tex}: reading log contents at {log_path}')
-            with open(log_path, 'r') as f:
-                output = f.read()
-
-            if check_for_errors:
-                message = [f'XeLaTeX compilation error(s), see {path_log.resolve()}.']
-                errors_with_lines = {m.span()[0]: m for m in re.finditer(r'! .*?l\.(\d+).*?\n{2}', output, re.DOTALL)}
-                errors_all = [m for m in re.finditer(r'! .*$', output, re.MULTILINE) if
-                              m.span()[0] not in errors_with_lines]
-
-                if len(errors_all) > 0 or len(errors_with_lines) > 0:
-                    shutil.copy(cache_log, path_log)
-                    shutil.copy(cache_tex, path_tex)
-
-                    tex_content = self._tex.split('\n')
-                    with open(tex_path) as f:
-                        tex_path_content = f.read().split('\n')
-                    line_row = {l: (match.group(1), match.group(2).lower()) for match, l in
-                                [(re.search(r'\\begin{tikzcard}.*% ROW (\d+) (FRONT|BACK)', line), l) for l, line in
-                                 enumerate(tex_path_content)] if match}
-
-                    for em in errors_with_lines.values():
-                        error_line = int(em.group(1))
-                        if error_line < min(line_row.keys()):
-                            message.append('\n' + em.group())
-                        else:
-                            error_row = [key for key in line_row.keys() if key - error_line <= 0][-1]
-                            row_id, edge = line_row[error_row]
-                            tex_edge_line = \
-                            [l for l, line in enumerate(tex_content) if re.search(r'\\cardlatex\[' + edge + ']', line)][
-                                -1]
-                            tex_line = tex_edge_line + error_line - error_row - 3
-                            tex_path_line = error_line - 3
-
-                            message.extend(['\n' + em.group(), f'>> Error at l. {tex_line} for row {row_id} ({edge})',
-                                            '>> ' + tex_content[tex_line - 1].strip('\t'),
-                                            '>> ' + tex_path_content[tex_path_line].strip('\t')])
-
-                    for em in errors_all:
-                        message.append('\n' + em.group())
-
-                if not tex_path.with_suffix('.pdf').exists():
-                    message.append(f'\nNo PDF built; no pages of output!')
-
-                if len(message) > 1:
-                    raise subprocess.SubprocessError('\n'.join(message))
-
-            return output
-
-        logging.info(f'{self._path}: resampled missing images')
-        if kwargs.get('draft', False):
-            with open(cache_tex, 'w') as f:
-                f.write(tex_draft)
-            logging.info(f'{self._path}: wrote draft tex contents to {cache_tex}')
-
-            # resample existing images
-            for directory, _, filenames in os.walk(self._cache_dir):
-                if (root := Path(directory)) != self._cache_dir:
-                    for file in filenames:
-                        img = Image(self._path.parent, self.cache_dir)
-                        try:
-                            img.find_source_from_cache(root / file)
-                            img.resample()
-                        except FileNotFoundError as e:
-                            logging.error(f'{self._path}: {e}')
-            logging.info(f'{self._path}: resampled existing images')
-
-            while True:
-                xelatex()
-                log = xelatex_read_log(check_for_errors=False)
-
-                # gather \graphicspath items from log
-                base_path = self._path.parent
-                graphicspaths = [base_path]
-                try:
-                    tex_graphicspaths = re.search(r'cardlatex@graphicpaths\n(.+?)\n', log).group(1)
-                    for path in tex_graphicspaths[1:-1].split('}{'):
-                        if is_relative(path):
-                            graphicspaths.append(base_path / path)
-                    for path in graphicspaths:
-                        if not path.is_relative_to(base_path):
-                            raise ValueError(f'{path} is not relative to the base directory {base_path}')
-                except AttributeError:
-                    pass  # no graphicspath other than base found
-
-                # gather missing images from log
-                not_found = []
-                for pattern in [r'! LaTeX Error: File `(.+)\' not found', r'LaTeX Warning: File `(.+)\' not found']:
-                    not_found.extend(r.group(1) for r in re.finditer(pattern, log))
-                not_found = set(not_found)
-
-                # resample missing images
-                if not_found:
-                    print(f'resampling missing images: {not_found}')
-                    for file in not_found:
-                        img = Image(self._path.parent, self.cache_dir)
-                        img.find_source_from_directories(file, *graphicspaths)
-                        img.resample()
-                    logging.info(f'{self._path}: resampled missing images')
-                else:
-                    break
-            with open(cache_tex, 'w') as f:
-                f.write(tex)
-            xelatex()
-            logging.info(f'{self._path}: wrote tex contents to {cache_tex}')
-            xelatex_read_log(check_for_errors=True)
-        else:
-            with open(path_tex, 'w') as f:
-                f.write(tex)
-            xelatex(path_tex)
-            xelatex_read_log(path_tex, path_tex.with_suffix('.log'), check_for_errors=True)
-
-            # delete, copy or move output to cache_dir to prepare for self.release()
-            for suffix, action, args in [('.synctex.gz', os.remove, ()),
-                                         ('.aux', os.remove, ()),
-                                         ('.log', shutil.move, (cache_log,)),
-                                         ('.pdf', shutil.move, (self._cache_output_pdf,)),
-                                         ('.tex', shutil.copy, (cache_tex,))]:
-                path = path_tex.with_suffix(suffix)
-                if path.exists():
-                    action(*(path, *args))
-            logging.info(f'{self._path}: moved output files to cache at {self._cache_dir}')
-
-        self._completed = True
-        return self
-
-    def release(self):
-        if self.completed:
-            output = self.cache_dir / self._path.name
-            log, pdf = output.with_suffix('.log'), output.with_suffix('.pdf')
-
-            shutil.copy(output.with_suffix('.tex'), path_tex := self._path.with_suffix('.cardlatex.tex'))
-            logging.info(f'{self._path}: copied tex to {path_tex}')
-            if log.exists():
-                shutil.copy(output.with_suffix('.log'), path_log := self._path.with_suffix('.log'))
-                logging.info(f'{self._path}: copied tex to {path_log}')
-            if pdf.exists():
-                shutil.move(output.with_suffix('.pdf'), path_pdf := self._path.with_suffix('.pdf'))
-                logging.info(f'{self._path}: copied tex to {path_pdf}')
-
-            logging.info(f'{self._path}: released')
