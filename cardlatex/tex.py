@@ -73,6 +73,7 @@ class Tex:
 
     @staticmethod
     def get_cache_dir(tex: Path | str):
+        # change this to the resolved filepath, so we can check for each filepath whether any should be removed (after all important actions are performed)
         return tempdir / sha256(Path(tex).resolve().as_posix())
 
     @property
