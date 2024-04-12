@@ -1,5 +1,7 @@
 import logging
+import shutil
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Tuple
@@ -44,7 +46,7 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, dr
 
         if combine and len(builds) > 1:
             if not all([b.completed for b in builds]):
-                raise RuntimeError('Not all .tex files have succesfully compiled.')
+                raise RuntimeError('Not all .tex files have successfully compiled.')
             combine_pdf(*[b.build_pdf_path for b in builds])
             builds[0].release()
         else:
@@ -57,10 +59,22 @@ def build(tex: Tuple[Path, ...], build_all: bool, combine: bool, paper: bool, dr
             raise e
         else:
             exit(1)
+    else:
+        cleanup()
     finally:
         end = datetime.now() - start
         print(f'cardlatex v{version} ran for {end}')
         logging.info(f'process ended in {end}')
+
+
+def cleanup():
+    last_month = time.time_ns() - int(1e9 * 60**2 * 24 * 30)
+    for directory in tempdir.iterdir():
+        if directory.is_dir():
+            for fn in directory.iterdir():
+                if fn.stem.startswith('.') and fn.suffix == '.cardlatex':
+                    if last_month > fn.lstat().st_mtime_ns:
+                        shutil.rmtree(directory)
 
 
 if __name__ == '__main__':

@@ -65,11 +65,6 @@ class Tex:
     @staticmethod
     def template() -> str:
         return template_tex
-        # with resources.open_text(cardlatex.resources, 'template.tex') as f:
-        #     return f.read()
-        # template_path = pkg_resources.resource_filename('cardlatex.resources', 'template.tex')
-        # with open(template_path) as f:
-        #     return f.read()
 
     @staticmethod
     def get_cache_dir(tex: Path | str):
@@ -89,7 +84,7 @@ class Tex:
         return self._completed
 
     def path(self, suffix: str = None, cache: bool = False):
-        if suffix:
+        if suffix is not None:
             return (self._cache_dir / self._path.name).with_suffix(suffix) if cache else self._path.with_suffix(suffix)
         else:
             return self._cache_dir if cache else self._path.parent
@@ -323,12 +318,18 @@ class Tex:
             self._completed = exitcode == 0
             logging.info(f'{self._path}: xelatex exitcode {exitcode}\n')
 
+        cache = self.path('', cache=True)
+        cache = cache.with_stem('.' + cache.stem).with_suffix('.cardlatex')
+        with open(cache, 'w') as f:
+            f.write(self._path.resolve().as_posix())
         return self
 
     def release(self):
         if self.completed:
             shutil.move(self.path('.pdf', cache=True), self.path('.pdf'))
             logging.info(f'{self._path}: released')
+        else:
+            raise RuntimeError(f'Error: {self.build_pdf_path} has failed to build!')
 
     @staticmethod
     def _resample(source: Path, target: Path):
