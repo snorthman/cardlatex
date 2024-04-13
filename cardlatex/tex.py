@@ -22,13 +22,15 @@ def sha256(encode: str) -> str:
     return obj.hexdigest()
 
 
-def prepare_template(template: str, config: Config):
+def prepare_template(template: str, config: Config, draft: bool):
     """
     Apply config options to the static resources/template.tex
     """
     for r in re.finditer(r'<\$(\w+)\$>', template):
         value = getattr(config, r.group(1))
         template = template.replace(r.group(), value)
+    if not draft and (m := re.search(r'\\node.+arabic\{cardlatex}', template)):
+        template = template[:m.start()] + '%' + template[m.start():]
     return template
 
 
@@ -127,11 +129,11 @@ class Tex:
         """
         build_all = kwargs.get('build_all', False)
 
-        template = prepare_template(self._template, self._config)
+        template = prepare_template(self._template, self._config, kwargs.get('draft', False))
         tex = prepare_inputs(self._tex, self._path.parent)
 
         # \begin{tikzcard}[dpi]{width}{height}{
-        tikz = r'\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}'
+        environment = r'\begin{tikzcard}[' + self._config.dpi + ']{' + self._config.width + '}{' + self._config.height + '}'
         texts = [self._config.front] + ([self._config.back] if self.has_back else [])
 
         if len(data) == 0:
@@ -169,10 +171,10 @@ class Tex:
                             text.append(line_replace(line))
                     text = '\n'.join(text)
 
-                row_id = f'\n% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
-                row_content.append('\n'.join(text_toggles) + row_id + tikz + text + '\\end{tikzcard}%\n')
-
-            for c in range(copies):
+                prefix = f'\n% ROW {row} ' + ('FRONT' if i == 0 else 'BACK') + '\n'
+                row_content.append('\n'.join(text_toggles) + prefix + environment + text + '\\end{tikzcard}%\n')
+            content.append('\\stepcounter{cardlatex}')
+            for _ in range(copies):
                 content.extend(row_content)
 
         content = '\n'.join(content)

@@ -51,6 +51,7 @@
 	\coordinate (C) at (\cardx/2,-\cardy/2);
 }
 
+\newcounter{cardlatex}
 \newenvironment{tikzcard}[3][0]{
 \tikzmath{
 	coordinate \card;
@@ -74,6 +75,7 @@
 	\setcoords
 	\begin{pgfonlayer}{print}
 		\draw[fill=black] ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
+		\node[anchor=north west,white,xshift=-\bleed,yshift=\bleed] at (TL) {\texttt{\arabic{cardlatex}}};
 	\end{pgfonlayer}
 	\pgfsetxvec{\pgfpoint{1cm}{0cm}}
 	\pgfsetyvec{\pgfpoint{0cm}{1cm}}

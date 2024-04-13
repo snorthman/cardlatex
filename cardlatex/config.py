@@ -82,7 +82,7 @@ class Config:
 
     @property
     def bleed(self) -> str:
-        return self._config.get('bleed', '0cm')
+        return self._config.get('bleed', '0.125in')
 
     @bleed.setter
     def bleed(self, value: str):
@@ -105,7 +105,7 @@ class Config:
         self._config['dpi'] = str(value)
 
     @property
-    def include(self) -> List[int]:
+    def include(self) -> List[int] | None:
         return self._config.get('include', None)
 
     @include.setter
