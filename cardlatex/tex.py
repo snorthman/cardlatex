@@ -264,7 +264,7 @@ class Tex:
                                 if file.lstat().st_mtime_ns != file_draft.lstat().st_mtime_ns:
                                     self._resample(file, file_draft)
                 if p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
-                    ln, err = int(process.match.group(1)), process.match.group(2).decode().strip('\r\n ')
+                    ln, err = int(process.match.group(1)), process.match.group(2).decode().strip('\n ').replace('\r', '')
                     ln_row, loc, fb = cardtex_rows[[ln >= r for r, _, _ in cardtex_rows].index(False) - 1]
                     if fb is None:
                         print('\n\t'.join([f'Error in preamble',
