@@ -20,7 +20,8 @@ if __name__ == '__main__':
             'pandas',
             'wand',
             'pikepdf',
-            'pexpect'
+            'pexpect',
+            'lxml'
         ],
         extras_require={
             'dev': [

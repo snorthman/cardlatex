@@ -11,6 +11,26 @@ import click
 from . import version, tempdir
 from .pdf import grid_pdf, combine_pdf
 from .tex import Tex
+from .xml import XML
+from .cache import Cache
+
+
+@click.command()
+@click.argument('xml', nargs=-1, type=click.Path(exists=True))
+@click.option('--debug', is_flag=True, hidden=True)
+def build_(xml: Tuple[Path, ...], debug: bool):
+    for file in xml:
+        start = datetime.now()
+        context = click.get_current_context()
+
+        p = Path(file)
+        c = Cache(p)
+        x = XML(p, c)
+        x.validate()
+
+
+
+
 
 
 @click.command()

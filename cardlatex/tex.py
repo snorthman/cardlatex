@@ -13,7 +13,7 @@ from wand.image import Image as WandImage
 
 from . import tempdir
 from .config import Config
-from .template import template as template_tex
+from .template import template_tex as template_tex
 
 
 def sha256(encode: str) -> str:
@@ -48,6 +48,11 @@ def prepare_inputs(tex: str, tex_dir: Path):
                 with open(input_path, 'r') as f:
                     tex = tex.replace(input_tex, f.read())
     return tex
+
+
+class Tex_:
+    def __init__(self, tex: Path):
+        pass
 
 
 class Tex:

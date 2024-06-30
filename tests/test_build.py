@@ -16,6 +16,11 @@ from cardlatex.tex import Tex
 args_build_params = [['all'], ['combine'], ['print'], ['draft']]
 
 
+@pytest.mark.parametrize('xml', ['test.xml'])
+def test_build_(test_dir: Path, click: Callable, xml: str):
+    click((test_dir / xml).as_posix())
+
+
 @pytest.fixture(params=chain(*[combinations(args_build_params, n) for n in range(len(args_build_params) + 1)]))
 def kwargs_build(request):
     return {args[0]: args[1] if len(args) == 2 else None for args in request.param}

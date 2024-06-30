@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="cardlatex">
+    <xs:complexType>
+      <xs:sequence maxOccurs="unbounded">
+        <xs:element name="tex">
+          <xs:complexType>
+            <xs:sequence maxOccurs="unbounded">
+              <xs:choice>
+                <xs:any processContents="skip" maxOccurs="unbounded"/>
+<!--                <xs:element name="cardgroup">-->
+<!--                  <xs:complexType>-->
+<!--                    <xs:sequence maxOccurs="unbounded">-->
+<!--                      <xs:choice>-->
+<!--                        <xs:element name="card" type="card" />-->
+<!--                      </xs:choice>-->
+<!--                    </xs:sequence>-->
+<!--                  </xs:complexType>-->
+<!--                </xs:element>-->
+<!--                <xs:element name="card" type="card" />-->
+              </xs:choice>
+            </xs:sequence>
+            <xs:attribute name="file" type="xs:string" use="required"/>
+            <xs:attribute name="dpi" type="xs:string" default="300"/>
+            <xs:attribute name="width" type="measurement" default="2.5in"/>
+            <xs:attribute name="height" type="measurement" default="3.5in"/>
+            <xs:attribute name="bleed" type="measurement" default="0.125in"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="draft" type="xs:boolean" use="required"/>
+      <xs:attribute name="print" type="xs:boolean" default="false"/>
+      <xs:attribute name="combine" type="xs:boolean" default="false"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:simpleType name="measurement">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d+(\.\d+)?(cm|mm|in)"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+<!--  <xs:complexType name="q">-->
+<!--    <xs:sequence maxOccurs="unbounded">-->
+<!--      <xs:choice>-->
+<!--        <xs:element name="cardgroup">-->
+<!--          <xs:complexType>-->
+<!--            <xs:sequence maxOccurs="unbounded">-->
+<!--              <xs:choice>-->
+<!--                <xs:element name="card" type="card" />-->
+<!--              </xs:choice>-->
+<!--            </xs:sequence>-->
+<!--          </xs:complexType>-->
+<!--        </xs:element>-->
+<!--        <xs:element name="card" type="card" />-->
+<!--      </xs:choice>-->
+<!--    </xs:sequence>-->
+<!--    <xs:attribute name="file" type="xs:string" use="required"/>-->
+<!--    <xs:attribute name="dpi" type="xs:string" default="300"/>-->
+<!--    <xs:attribute name="width" type="measurement" default="2.5in"/>-->
+<!--    <xs:attribute name="height" type="measurement" default="3.5in"/>-->
+<!--    <xs:attribute name="bleed" type="measurement" default="0.125in"/>-->
+<!--  </xs:complexType>-->
+</xs:schema>
