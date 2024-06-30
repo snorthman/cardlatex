@@ -4,7 +4,7 @@ from lxml import etree
 
 from .template import template_xsd
 from .cache import Cache
-from .tex import Tex
+from .tex import Tex_ as Tex
 
 
 class XML:
@@ -27,7 +27,7 @@ class XML:
         for el in root:
             file = self._cache.working_directory() / el.attrib['file']
 
-            self._tex.append(Tex(self._cache.working_directory() / el.attrib['file']))
+            self._tex.append(Tex(file, **dict(el.attrib)))
         pass
 
         # gather tex files, create Tex objects, create xsd templates based on variables (and defaults), then validate self

@@ -22,6 +22,7 @@
             </xs:sequence>
             <xs:attribute name="file" type="xs:string" use="required"/>
             <xs:attribute name="dpi" type="xs:string" default="300"/>
+            <xs:attribute name="spacing" type="measurement" default="0"/>
             <xs:attribute name="width" type="measurement" default="2.5in"/>
             <xs:attribute name="height" type="measurement" default="3.5in"/>
             <xs:attribute name="bleed" type="measurement" default="0.125in"/>
@@ -36,7 +37,7 @@
 
   <xs:simpleType name="measurement">
     <xs:restriction base="xs:string">
-      <xs:pattern value="\d+(\.\d+)?(cm|mm|in)"/>
+      <xs:pattern value="\d+(\.\d+)?(cm|mm|in)?"/>
     </xs:restriction>
   </xs:simpleType>
 
