@@ -2,8 +2,8 @@
 <cardlatex draft="true">
 	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
 		<!--	Poker size	-->
-		<cardgroup>
+		<card>
 			~
-		</cardgroup>
+		</card>
 	</tex>
 </cardlatex>

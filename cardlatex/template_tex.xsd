@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:element name="card">
+		<xs:complexType>
+			<xs:all minOccurs="0">
+				<xs:element name="card" type="card" />
+			</xs:all>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

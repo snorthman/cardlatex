@@ -25,8 +25,8 @@ def build_(xml: Tuple[Path, ...], debug: bool):
 
         p = Path(file)
         c = Cache(p)
-        x = XML(p, c)
-        x.validate()
+        x = XML(c)
+        x.validate(p)
 
 
 

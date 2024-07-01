@@ -21,7 +21,7 @@ if __name__ == '__main__':
             'wand',
             'pikepdf',
             'pexpect',
-            'lxml'
+            'xmlschema'
         ],
         extras_require={
             'dev': [

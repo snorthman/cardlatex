@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from lxml import etree
+import xmlschema
 
 from .template import template_xsd
 from .cache import Cache
@@ -8,26 +9,29 @@ from .tex import Tex_ as Tex
 
 
 class XML:
-    def __init__(self, file: Path, cache: Cache):
-        self._xml = etree.parse(file)
-        self._schema = etree.XMLSchema(etree.XML(template_xsd.encode()))
+    def __init__(self, cache: Cache):
+        self._schema = xmlschema.XMLSchema11(template_xsd)
         self._cache = cache
         self._tex: list[Tex] = []
 
-        self._options: dict[str, str] = self._xml.getroot().attrib
+        # self._options: dict[str, str] = self._xml.getroot().attrib
 
     @property
     def draft(self) -> bool:
         return self._options['draft'].lower() == 'true'
 
-    def validate(self):
-        self._schema.assertValid(self._xml)
+    def validate(self, file: Path):
+        self._schema.validate(file.as_posix())
+        xml: dict = self._schema..to_dict(file.as_posix())
 
-        root = self._xml.getroot()
-        for el in root:
-            file = self._cache.working_directory() / el.attrib['file']
+        for tex in xml['tex']:
+            file = self._cache.working_directory() / tex['@file']
+            assert file.exists(), FileNotFoundError(file)
 
-            self._tex.append(Tex(file, **dict(el.attrib)))
+            tex = Tex(file, {key[1:]: value for key, value in tex.items() if key.startswith('@')})
+
+            self._tex.append(tex)
+
         pass
 
         # gather tex files, create Tex objects, create xsd templates based on variables (and defaults), then validate self

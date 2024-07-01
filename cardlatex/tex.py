@@ -52,15 +52,20 @@ def prepare_inputs(tex: str, tex_dir: Path):
 
 
 class Tex_:
-    def __init__(self, tex: Path, **kwargs):
-        with open(tex, 'r') as f:
+    def __init__(self, file: Path, attributes: dict):
+        with open(file, 'r') as f:
             self._tex = f.read()
 
-        self._config = {
-            **{self._as_length(prop, kwargs[prop]) for prop in ('width', 'height', 'bleed', 'spacing')},
-            'dpi': str(kwargs['dpi'])
-        }
+        self._width = self._as_length(attributes.get('width', '2.5in'))
+        self._height = self._as_length(attributes.get('height', '3.5in'))
+        self._bleed = self._as_length(attributes.get('bleed', '0.125in'))
+        self._spacing = self._as_length(attributes.get('spacing', '0'))
+        self._dpi = attributes.get('dpi', '150')
+        self._text = attributes.get('text', 'text')
+        self._props = {'front': None, 'back': None}
+        self._variables = set()
 
+        # gather \cardlatex directives
         prop_name = lambda a: r'\cardlatex configuration object' + (f'" {a}"' if a else '')
         matches: list[re.Match] = list(re.finditer(r'^(.*)\\cardlatex\[(\w+)]\{', self._tex, re.M))
         for m, match in enumerate(matches):
@@ -68,14 +73,14 @@ class Tex_:
                 continue
 
             prop = match.group(2)
-            assert prop in ['front', 'back'], (
+            assert prop in self._props.keys(), (
                 KeyError(rf'unknown {prop_name(prop)}'))
-            assert prop not in self._config, (
+            assert self._props[prop] is None, (
                 KeyError(rf'duplicate {prop_name(prop)}'))
 
             b = 1
             rb: re.Match | None = None
-            for rb in re.finditer(r'(?<!\\)[{}]', tex[match.end():]):
+            for rb in re.finditer(r'(?<!\\)[{}]', self._tex[match.end():]):
                 b = b + (1 if rb.group() == '{' else -1)
                 if b == 0:
                     break
@@ -87,122 +92,21 @@ class Tex_:
                 assert endpos < matches[m + 1].start(), (
                     ValueError(rf'{prop_name("")} found inside {prop_name(prop)}'))
 
-            self._config[prop] = tex[match.end():endpos]
+            self._props[prop] = self._tex[match.end():endpos]
 
-        if 'front' not in self._config:
+        if self._props['front'] is None:
             raise ValueError(prop_name('front') + ' missing')
 
     @staticmethod
-    def _as_length(prop: str, value: str):
+    def _as_length(value: str):
         value = str(value).strip()
         assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
-            ValueError(f'invalid value "{value}" for {prop}'))
+            ValueError(f'invalid measurement value "{value}"'))
         return value
 
-
-class TexConfig:
-    def __init__(self, tex: str):
-        self._config = dict()
-
-        props = set()
-        prop_name = lambda a: r'\cardlatex configuration object' + (f'" {a}"' if a else '')
-        matches: list[re.Match] = list(re.finditer(r'^(.*)\\cardlatex\[(\w+)]\{', tex, re.M))
-        for m, match in enumerate(matches):
-            if '%' in match.group(1):
-                continue
-
-            assert  hasattr(Config, prop := match.group(2)), (
-                KeyError(rf'unknown {prop_name(prop)}'))
-            assert prop not in props, (
-                KeyError(rf'duplicate {prop_name(prop)}'))
-            props.add(prop)
-
-            b = 1
-            rb: re.Match | None = None
-            for rb in re.finditer(r'(?<!\\)[{}]', tex[match.end():]):
-                b = b + (1 if rb.group() == '{' else -1)
-                if b == 0:
-                    break
-            assert b == 0 and rb, (
-                ValueError(rf'no closing bracket found for {prop_name(prop)}'))
-
-            endpos = match.end() + rb.end() - 1
-            if m < len(matches) - 1:
-                assert endpos < matches[m + 1].start(), (
-                    ValueError(rf'{prop_name("")} found inside {prop_name(prop)}'))
-
-            setattr(self, prop, tex[match.end():endpos])
-
-        if 'front' not in self._config:
-            raise ValueError(prop_name('front') + ' missing')
-
-    def _to_length_prop(self, prop: str, value: str):
-        value = str(value).strip()
-        assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
-            ValueError(f'invalid value "{value}" for {prop}'))
-        self._config[prop] = value
-
-    def __getitem__(self, item):
-        return self._config[item]
-
-    def __contains__(self, item):
-        return item in self._config
-
     @property
-    def width(self) -> str:
-        return self._config['width']
-
-    @width.setter
-    def width(self, value: str):
-        self._to_length_prop('width', value)
-
-    @property
-    def height(self) -> str:
-        return self._config['height']
-
-    @height.setter
-    def height(self, value: str):
-        self._to_length_prop('height', value)
-
-    @property
-    def bleed(self) -> str:
-        return self._config.get('bleed', '0.125in')
-
-    @bleed.setter
-    def bleed(self, value: str):
-        self._to_length_prop('bleed', value)
-
-    @property
-    def spacing(self) -> str:
-        return self._config.get('spacing', '0cm')
-
-    @spacing.setter
-    def spacing(self, value: str):
-        self._to_length_prop('spacing', value)
-
-    @property
-    def dpi(self) -> str:
-        return self._config.get('dpi', '0')
-
-    @dpi.setter
-    def dpi(self, value: str):
-        self._config['dpi'] = str(value)
-
-    @property
-    def front(self) -> str:
-        return self._config['front']
-
-    @front.setter
-    def front(self, value: str):
-        self._config['front'] = value
-
-    @property
-    def back(self) -> str:
-        return self._config.get('back', self.front)
-
-    @back.setter
-    def back(self, value: str):
-        self._config['back'] = value
+    def variables(self):
+        return set(sorted(list({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', ''.join(self._props.values()))})))
 
 
 class Tex:
