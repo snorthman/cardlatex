@@ -41,8 +41,10 @@ class XML:
 
         # for tex in self._tex:
         schema = xmlschema.XMLSchema11(template.render(texelements=texelements))
-        q = template.render(texelements=texelements)
         schema.validate(xml)
+
+        for tex in self._tex:
+            tex.write(self._cache)
         pass
 
         # gather tex files, create Tex objects, create xsd templates based on variables (and defaults), then validate self

@@ -14,7 +14,8 @@ from wand.image import Image as WandImage
 
 from . import tempdir
 from .config import Config
-from .template import template_tex as template_tex
+from .template import template_tex
+from .cache import Cache
 
 
 def sha256(encode: str) -> str:
@@ -56,6 +57,7 @@ class Tex_:
         with open(file, 'r') as f:
             self._tex = f.read()
 
+        self._name = file.name
         self._width = self._as_length(attributes['@width'])
         self._height = self._as_length(attributes['@height'])
         self._bleed = self._as_length(attributes['@bleed'])
@@ -70,6 +72,10 @@ class Tex_:
         assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
             ValueError(f'invalid measurement value "{value}"'))
         return value
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def variables(self):
@@ -111,7 +117,39 @@ class Tex_:
 
         return props
 
-    def _add_card(self, card: dict):
+    def write(self, cache: Cache):
+        t, rr = '', 0
+        for m in re.finditer(r'<\$(\w+)\$>', template_tex):
+            l, r = m.span()
+            key = m.group(1)
+
+            if key == 'bleed':
+                value = self._bleed
+            elif key == 'counter':  # and self._draft is true
+                value = r'\node[anchor=north west,white,xshift=-\bleed,yshift=\bleed] at (TL) {\texttt{\arabic{cardlatex}}};'
+            else:
+                raise SystemError(f'template.tex has an unknown key {key}')
+
+            t += template_tex[rr:l] + value
+            rr = r
+        t += template_tex[rr:]
+        tex = t
+
+        t, rr = '', 0
+        for m in re.finditer(r'^(.*)(\\input\{([\w.]+)})', tex):
+            l, r = m.span(2)
+
+            input_path = (cache.working_directory() / m.group(3)).with_suffix('.tex')
+            if '%' in m.group(1) or not input_path.exists():
+                value = ''
+            else:
+                with open(input_path, 'r') as f:
+                    value = f.read()
+
+            t += template_tex[rr:l] + value
+            rr = r
+        t += template_tex[rr:]
+        tex = t
         pass
 
 
