@@ -56,16 +56,29 @@ class Tex_:
         with open(file, 'r') as f:
             self._tex = f.read()
 
-        self._width = self._as_length(attributes.get('width', '2.5in'))
-        self._height = self._as_length(attributes.get('height', '3.5in'))
-        self._bleed = self._as_length(attributes.get('bleed', '0.125in'))
-        self._spacing = self._as_length(attributes.get('spacing', '0'))
-        self._dpi = attributes.get('dpi', '150')
-        self._text = attributes.get('text', 'text')
-        self._props = {'front': None, 'back': None}
-        self._variables = set()
+        self._width = self._as_length(attributes['@width'])
+        self._height = self._as_length(attributes['@height'])
+        self._bleed = self._as_length(attributes['@bleed'])
+        self._spacing = self._as_length(attributes['@spacing'])
+        self._dpi = attributes['@dpi']
+        self._text = attributes['@text']
+        self._props = self._set_props()
+        self._cards = [self._add_card(_) for _ in attributes['card']]
 
-        # gather \cardlatex directives
+    @staticmethod
+    def _as_length(value: str):
+        value = str(value).strip()
+        assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
+            ValueError(f'invalid measurement value "{value}"'))
+        return value
+
+    @property
+    def variables(self):
+        front_back = self._props['front'] + (self._props['back'] if self._props['back'] else '')
+        return set(sorted(list({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', front_back)})))
+
+    def _set_props(self):
+        props = {'front': None, 'back': None}
         prop_name = lambda a: r'\cardlatex configuration object' + (f'" {a}"' if a else '')
         matches: list[re.Match] = list(re.finditer(r'^(.*)\\cardlatex\[(\w+)]\{', self._tex, re.M))
         for m, match in enumerate(matches):
@@ -73,9 +86,9 @@ class Tex_:
                 continue
 
             prop = match.group(2)
-            assert prop in self._props.keys(), (
+            assert prop in props.keys(), (
                 KeyError(rf'unknown {prop_name(prop)}'))
-            assert self._props[prop] is None, (
+            assert props[prop] is None, (
                 KeyError(rf'duplicate {prop_name(prop)}'))
 
             b = 1
@@ -92,21 +105,16 @@ class Tex_:
                 assert endpos < matches[m + 1].start(), (
                     ValueError(rf'{prop_name("")} found inside {prop_name(prop)}'))
 
-            self._props[prop] = self._tex[match.end():endpos]
+            props[prop] = self._tex[match.end():endpos]
 
-        if self._props['front'] is None:
+        if props['front'] is None:
             raise ValueError(prop_name('front') + ' missing')
 
-    @staticmethod
-    def _as_length(value: str):
-        value = str(value).strip()
-        assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
-            ValueError(f'invalid measurement value "{value}"'))
-        return value
+        return props
 
-    @property
-    def variables(self):
-        return set(sorted(list({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', ''.join(self._props.values()))})))
+    def _add_card(self, card: dict):
+        pass
+
 
 
 class Tex:

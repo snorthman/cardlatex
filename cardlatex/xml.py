@@ -10,7 +10,7 @@ from .tex import Tex_ as Tex
 
 class XML:
     def __init__(self, cache: Cache):
-        self._schema = xmlschema.XMLSchema11(template_xsd)
+        self._schema = xmlschema.XMLSchema10(template_xsd)
         self._cache = cache
         self._tex: list[Tex] = []
 
@@ -22,13 +22,13 @@ class XML:
 
     def validate(self, file: Path):
         self._schema.validate(file.as_posix())
-        xml: dict = self._schema..to_dict(file.as_posix())
+        xml: dict = self._schema.to_dict(file.as_posix())
 
         for tex in xml['tex']:
             file = self._cache.working_directory() / tex['@file']
             assert file.exists(), FileNotFoundError(file)
 
-            tex = Tex(file, {key[1:]: value for key, value in tex.items() if key.startswith('@')})
+            tex = Tex(file, tex)
 
             self._tex.append(tex)
 

@@ -2,8 +2,10 @@
 <cardlatex draft="true">
 	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
 		<!--	Poker size	-->
-		<card>
-			~
+		<card copies="2">
+			<title>hello</title>
+			<art>background</art>
+			content
 		</card>
 	</tex>
 </cardlatex>

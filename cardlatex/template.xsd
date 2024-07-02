@@ -1,34 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" vc:minVersion="1.1">
-  <xs:complexType name="TypeA">
-    <xs:sequence>
-      <xs:element name="description" type="xs:string"/>
-      <xs:element name="value" type="xs:int"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <xs:complexType name="TypeB">
-    <xs:sequence>
-      <xs:element name="name" type="xs:string"/>
-      <xs:element name="price" type="xs:decimal"/>
-    </xs:sequence>
-  </xs:complexType>
-
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:element name="cardlatex">
     <xs:complexType>
       <xs:sequence maxOccurs="unbounded">
         <xs:element name="tex">
           <xs:complexType>
             <xs:sequence maxOccurs="unbounded">
-              <xs:any processContents="skip" maxOccurs="unbounded"/>
+              <xs:element name="card" maxOccurs="unbounded">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+                  </xs:sequence>
+                  <xs:attribute name="copies" default="1"/>
+                </xs:complexType>
+              </xs:element>
             </xs:sequence>
             <xs:attribute name="file" type="xs:string" use="required"/>
-            <xs:attribute name="text" type="xs:string"/>
-            <xs:attribute name="dpi" type="xs:string"/>
-            <xs:attribute name="spacing" type="measurement"/>
-            <xs:attribute name="width" type="measurement"/>
-            <xs:attribute name="height" type="measurement"/>
-            <xs:attribute name="bleed" type="measurement"/>
+            <xs:attribute name="text" type="xs:string" default="text"/>
+            <xs:attribute name="dpi" type="xs:string" default="150"/>
+            <xs:attribute name="spacing" type="measurement" default="0"/>
+            <xs:attribute name="width" type="measurement" default="2.5in"/>
+            <xs:attribute name="height" type="measurement" default="3.5in"/>
+            <xs:attribute name="bleed" type="measurement" default="0.125in"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
@@ -43,26 +36,4 @@
       <xs:pattern value="\d+(\.\d+)?(cm|mm|in)?"/>
     </xs:restriction>
   </xs:simpleType>
-
-<!--  <xs:complexType name="q">-->
-<!--    <xs:sequence maxOccurs="unbounded">-->
-<!--      <xs:choice>-->
-<!--        <xs:element name="cardgroup">-->
-<!--          <xs:complexType>-->
-<!--            <xs:sequence maxOccurs="unbounded">-->
-<!--              <xs:choice>-->
-<!--                <xs:element name="card" type="card" />-->
-<!--              </xs:choice>-->
-<!--            </xs:sequence>-->
-<!--          </xs:complexType>-->
-<!--        </xs:element>-->
-<!--        <xs:element name="card" type="card" />-->
-<!--      </xs:choice>-->
-<!--    </xs:sequence>-->
-<!--    <xs:attribute name="file" type="xs:string" use="required"/>-->
-<!--    <xs:attribute name="dpi" type="xs:string" default="300"/>-->
-<!--    <xs:attribute name="width" type="measurement" default="2.5in"/>-->
-<!--    <xs:attribute name="height" type="measurement" default="3.5in"/>-->
-<!--    <xs:attribute name="bleed" type="measurement" default="0.125in"/>-->
-<!--  </xs:complexType>-->
 </xs:schema>
