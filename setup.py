@@ -21,7 +21,8 @@ if __name__ == '__main__':
             'wand',
             'pikepdf',
             'pexpect',
-            'xmlschema'
+            'xmlschema',
+            'jinja2'
         ],
         extras_require={
             'dev': [

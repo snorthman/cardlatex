@@ -61,9 +61,8 @@ class Tex_:
         self._bleed = self._as_length(attributes['@bleed'])
         self._spacing = self._as_length(attributes['@spacing'])
         self._dpi = attributes['@dpi']
-        self._text = attributes['@text']
         self._props = self._set_props()
-        self._cards = [self._add_card(_) for _ in attributes['card']]
+        self._vars = {key: None for key in self.variables}
 
     @staticmethod
     def _as_length(value: str):

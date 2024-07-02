@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from lxml import etree
+import jinja2
 import xmlschema
 
 from .template import template_xsd
@@ -10,7 +10,6 @@ from .tex import Tex_ as Tex
 
 class XML:
     def __init__(self, cache: Cache):
-        self._schema = xmlschema.XMLSchema10(template_xsd)
         self._cache = cache
         self._tex: list[Tex] = []
 
@@ -21,17 +20,29 @@ class XML:
         return self._options['draft'].lower() == 'true'
 
     def validate(self, file: Path):
-        self._schema.validate(file.as_posix())
-        xml: dict = self._schema.to_dict(file.as_posix())
+        with open(file) as f:
+            xml = f.read()
 
-        for tex in xml['tex']:
-            file = self._cache.working_directory() / tex['@file']
+        template = jinja2.Template(template_xsd)
+        schema = xmlschema.XMLSchema11(template.render())
+        schema.validate(xml)
+
+        texelements = []
+        for element in schema.to_dict(xml)['tex']:
+            file = self._cache.working_directory() / element['@file']
             assert file.exists(), FileNotFoundError(file)
 
-            tex = Tex(file, tex)
+            self._tex.append(tex := Tex(file, element))
+            texelements.append({
+                'type': element['@file'],
+                'file': element['@file'],
+                'variables': list(tex.variables)
+            })
 
-            self._tex.append(tex)
-
+        # for tex in self._tex:
+        schema = xmlschema.XMLSchema11(template.render(texelements=texelements))
+        q = template.render(texelements=texelements)
+        schema.validate(xml)
         pass
 
         # gather tex files, create Tex objects, create xsd templates based on variables (and defaults), then validate self

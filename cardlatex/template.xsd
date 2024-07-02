@@ -1,29 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+           vc:minVersion="1.1">
   <xs:element name="cardlatex">
     <xs:complexType>
       <xs:sequence maxOccurs="unbounded">
-        <xs:element name="tex">
-          <xs:complexType>
-            <xs:sequence maxOccurs="unbounded">
-              <xs:element name="card" maxOccurs="unbounded">
-                <xs:complexType>
-                  <xs:sequence>
-                    <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
-                  </xs:sequence>
-                  <xs:attribute name="copies" default="1"/>
-                </xs:complexType>
-              </xs:element>
-            </xs:sequence>
-            <xs:attribute name="file" type="xs:string" use="required"/>
-            <xs:attribute name="text" type="xs:string" default="text"/>
-            <xs:attribute name="dpi" type="xs:string" default="150"/>
-            <xs:attribute name="spacing" type="measurement" default="0"/>
-            <xs:attribute name="width" type="measurement" default="2.5in"/>
-            <xs:attribute name="height" type="measurement" default="3.5in"/>
-            <xs:attribute name="bleed" type="measurement" default="0.125in"/>
-          </xs:complexType>
-        </xs:element>
+        {% if not texelements %}
+          <xs:element name="tex" type="__init__"/>
+        {% else %}
+          <xs:element name="tex">
+          {% for texelement in texelements %}
+            <xs:alternative test="@file = '{{ texelement.file }}'" type="{{ texelement.type }}" />
+          {% endfor %}
+          </xs:element>
+        {% endif %}
       </xs:sequence>
       <xs:attribute name="draft" type="xs:boolean" use="required"/>
       <xs:attribute name="print" type="xs:boolean" default="false"/>
@@ -31,9 +21,50 @@
     </xs:complexType>
   </xs:element>
 
+  <xs:attributeGroup name="tex">
+    <xs:attribute name="file" type="xs:string" use="required"/>
+    <xs:attribute name="dpi" type="xs:string" default="150"/>
+    <xs:attribute name="spacing" type="measurement" default="0"/>
+    <xs:attribute name="width" type="measurement" default="2.5in"/>
+    <xs:attribute name="height" type="measurement" default="3.5in"/>
+    <xs:attribute name="bleed" type="measurement" default="0.125in"/>
+  </xs:attributeGroup>
+
   <xs:simpleType name="measurement">
     <xs:restriction base="xs:string">
       <xs:pattern value="\d+(\.\d+)?(cm|mm|in)?"/>
     </xs:restriction>
   </xs:simpleType>
+
+  <xs:complexType name="__init__">
+    <xs:sequence maxOccurs="unbounded">
+      <xs:element name="card" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
+          </xs:sequence>
+          <xs:attribute name="copies" default="1"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attributeGroup ref="tex"/>
+  </xs:complexType>
+
+  {% for texelement in texelements %}
+  <xs:complexType name="{{ texelement.type }}">
+    <xs:sequence maxOccurs="unbounded">
+      <xs:element name="card" maxOccurs="unbounded">
+        <xs:complexType>
+          <xs:all minOccurs="0">
+            {% for variable in texelement.variables %}
+            <xs:element name="{{ variable }}" type="xs:string"/>
+            {% endfor %}
+          </xs:all>
+          <xs:attribute name="copies" default="1"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+    <xs:attributeGroup ref="tex"/>
+  </xs:complexType>
+  {% endfor %}
 </xs:schema>

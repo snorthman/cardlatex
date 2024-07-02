@@ -3,9 +3,15 @@
 	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
 		<!--	Poker size	-->
 		<card copies="2">
-			<title>hello</title>
 			<art>background</art>
-			content
+			<title>hello</title>
+			<text>
+				no
+
+					or
+
+				maybe
+			</text>
 		</card>
 	</tex>
 </cardlatex>
