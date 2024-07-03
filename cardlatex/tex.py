@@ -52,6 +52,12 @@ def prepare_inputs(tex: str, tex_dir: Path):
     return tex
 
 
+graphicpaths = r"""
+\typeout{cardlatex@graphicpaths}
+\makeatletter\typein{\Ginput@path}\makeatother
+"""
+
+
 class Tex_:
     def __init__(self, file: Path, attributes: dict):
         with open(file, 'r') as f:
@@ -64,7 +70,19 @@ class Tex_:
         self._spacing = self._as_length(attributes['@spacing'])
         self._dpi = attributes['@dpi']
         self._props = self._set_props()
-        self._vars = {key: None for key in self.variables}
+        self._cards = attributes.get('card', [])
+        self._test = []
+        self._vars = set()
+
+        for t in attributes.get('@test', '').split(','):
+            if m := re.search(r'(\d+)(?:-(\d+)|\.{2,}(\d+))', t):
+                l, r = m.group(1), m.group(2) if m.group(2) else m.group(3)
+            else:
+                l, r = t, t
+            self._test.extend(range(int(l), int(r) + 1))
+
+        for m in re.finditer(r'<\$(\w+)\$>', self._props['front'] + (self._props['back'] if self._props['back'] else '')):
+            self._vars.add(m.group(1))
 
     @staticmethod
     def _as_length(value: str):
@@ -78,9 +96,8 @@ class Tex_:
         return self._name
 
     @property
-    def variables(self):
-        front_back = self._props['front'] + (self._props['back'] if self._props['back'] else '')
-        return set(sorted(list({r.group(1) for r in re.finditer(r'<\$(\w+)\$>', front_back)})))
+    def variables(self) -> frozenset:
+        return frozenset(self._vars)
 
     def _set_props(self):
         props = {'front': None, 'back': None}
@@ -117,7 +134,9 @@ class Tex_:
 
         return props
 
-    def write(self, cache: Cache):
+    def write(self, cache: Cache, is_draft: bool, is_print: bool):
+        tex = {}
+
         t, rr = '', 0
         for m in re.finditer(r'<\$(\w+)\$>', template_tex):
             l, r = m.span()
@@ -133,10 +152,10 @@ class Tex_:
             t += template_tex[rr:l] + value
             rr = r
         t += template_tex[rr:]
-        tex = t
+        tex['@template'] = t
 
         t, rr = '', 0
-        for m in re.finditer(r'^(.*)(\\input\{([\w.]+)})', tex):
+        for m in re.finditer(r'^(.*)(\\input\{([\w.]+)})', self._tex):
             l, r = m.span(2)
 
             input_path = (cache.working_directory() / m.group(3)).with_suffix('.tex')
@@ -146,12 +165,62 @@ class Tex_:
                 with open(input_path, 'r') as f:
                     value = f.read()
 
-            t += template_tex[rr:l] + value
+            t += self._tex[rr:l] + value
             rr = r
-        t += template_tex[rr:]
-        tex = t
-        pass
+        t += self._tex[rr:]
+        tex['user tex input'] = t
 
+        tex['graphicpaths'] = graphicpaths
+        tex['toggles'] = '\n'.join([r'\newtoggle{' + value + '}' for value in self.variables])
+        tex['document'] = '\\begin{document}\n\n'
+        tex['@cards'] = ''
+        variables: dict[str, str | None] = {v: None for v in self.variables}
+        for c, card in enumerate(self._cards, start=1):
+            if not is_print and len(self._test) > 0 and c not in self._test:
+                continue
+
+            for v in self.variables:
+                if v in card:
+                    variables[v] = card[v][0]
+
+            tex['@cards'] += '\n'.join([r'\toggle' + ('false' if t is None else 'true') + '{' + v + '}' for v, t in variables.items()])
+
+            for i in range(card['@copies'] if not is_draft else 1):
+                for prop in ('front', 'back'):
+                    text = self._props[prop]
+                    if not text:
+                        continue
+
+                    for var in self.variables:
+                        text = text.replace(fr'\if<${var}$>', r'\ifvar{' + var + '}')
+                        if variables[var] is None:
+                            value = ''
+                        else:
+                            value = variables[var].replace('\t', ' ').strip('\n\t ')
+                            # apply keywords to value here
+
+                        text = text.replace(f'<${var}$>', value)
+
+                    tex['@cards'] += '\n'.join([
+                        f'\n\n% CARD {c}, COPY {i + 1}, {prop.upper()}',
+                        r'\begin{tikzcard}[' + self._dpi + ']{' + self._width + '}{' + self._height + '}',
+                        text,
+                        '\\end{tikzcard}%'
+                    ])
+
+            tex['@cards'] += '\n\\stepcounter{cardlatex}\n\n'
+        tex['@cards'] = '\n\t' + tex['@cards'].replace('\n', '\n\t')
+
+        tex['@documentend'] = '\n\\end{document}'
+
+        with open((cache.cache_directory() / self.name).with_suffix('.cardlatex.tex'), 'w') as f:
+            for key, value in tex.items():
+                if not key.startswith('@'):
+                    f.write('\n\n' + '%' * 68 + '\n% ' + key.upper() + '\n\n')
+                f.write(value)
+
+    def xelatex(self, cache: Cache, is_draft: bool, is_print: bool):
+        file = (cache.cache_directory() / self.name).with_suffix('.cardlatex.tex')
 
 
 class Tex:

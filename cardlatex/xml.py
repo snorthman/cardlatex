@@ -12,12 +12,9 @@ class XML:
     def __init__(self, cache: Cache):
         self._cache = cache
         self._tex: list[Tex] = []
-
-        # self._options: dict[str, str] = self._xml.getroot().attrib
-
-    @property
-    def draft(self) -> bool:
-        return self._options['draft'].lower() == 'true'
+        self._draft = None
+        self._print = None
+        self._paper = None
 
     def validate(self, file: Path):
         with open(file) as f:
@@ -26,9 +23,14 @@ class XML:
         template = jinja2.Template(template_xsd)
         schema = xmlschema.XMLSchema11(template.render())
         schema.validate(xml)
+        xml_dict: dict = schema.to_dict(xml)
+
+        self._draft = xml_dict['@draft']
+        self._print = xml_dict['@print']
+        self._paper = xml_dict.get('@paper', None)
 
         texelements = []
-        for element in schema.to_dict(xml)['tex']:
+        for element in xml_dict['tex']:
             file = self._cache.working_directory() / element['@file']
             assert file.exists(), FileNotFoundError(file)
 
@@ -39,13 +41,12 @@ class XML:
                 'variables': list(tex.variables)
             })
 
-        # for tex in self._tex:
         schema = xmlschema.XMLSchema11(template.render(texelements=texelements))
         schema.validate(xml)
 
+    def build(self):
         for tex in self._tex:
-            tex.write(self._cache)
-        pass
+            tex.write(self._cache, is_draft=self._draft, is_print=self._print)
 
-        # gather tex files, create Tex objects, create xsd templates based on variables (and defaults), then validate self
-
+        for tex in self._tex:
+            tex.xelatex(self._cache, is_draft=self._draft, is_print=self._print)

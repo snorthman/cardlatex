@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <cardlatex draft="true">
-	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
+	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in" test="1">
 		<!--	Poker size	-->
 		<card copies="2">
 			<art>background</art>
@@ -12,6 +12,10 @@
 
 				maybe
 			</text>
+		</card>
+		<card>
+			<text/>
+			<art>background_combine</art>
 		</card>
 	</tex>
 </cardlatex>

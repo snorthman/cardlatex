@@ -15,9 +15,19 @@
           </xs:element>
         {% endif %}
       </xs:sequence>
+      <!--   use low resolution images, respect 'test' attributes and ignore 'copies' attributes   -->
       <xs:attribute name="draft" type="xs:boolean" use="required"/>
+      <!--   ignore 'test' attributes   -->
       <xs:attribute name="print" type="xs:boolean" default="false"/>
-      <xs:attribute name="combine" type="xs:boolean" default="false"/>
+      <!--   grid all cards onto <paper size>   -->
+      <xs:attribute name="paper">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="A3"/>
+            <xs:enumeration value="A4"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 
@@ -28,6 +38,24 @@
     <xs:attribute name="width" type="measurement" default="2.5in"/>
     <xs:attribute name="height" type="measurement" default="3.5in"/>
     <xs:attribute name="bleed" type="measurement" default="0.125in"/>
+    <xs:attribute name="test">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value="(\d+((-\d+)|(\.{2,}\d+))?,*)+"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+
+  <xs:attributeGroup name="card">
+    <xs:attribute name="copies" default="1">
+      <xs:simpleType>
+        <xs:restriction base="xs:integer">
+          <xs:minExclusive value="0"/>
+          <xs:maxExclusive value="100"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
   </xs:attributeGroup>
 
   <xs:simpleType name="measurement">
@@ -43,7 +71,7 @@
           <xs:sequence>
             <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax"/>
           </xs:sequence>
-          <xs:attribute name="copies" default="1"/>
+          <xs:attributeGroup ref="card"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
@@ -57,10 +85,10 @@
         <xs:complexType>
           <xs:all minOccurs="0">
             {% for variable in texelement.variables %}
-            <xs:element name="{{ variable }}" type="xs:string"/>
+            <xs:element minOccurs="0" name="{{ variable }}" type="xs:string"/>
             {% endfor %}
           </xs:all>
-          <xs:attribute name="copies" default="1"/>
+          <xs:attributeGroup ref="card"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>

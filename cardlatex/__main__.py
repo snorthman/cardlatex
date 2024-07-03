@@ -16,17 +16,31 @@ from .cache import Cache
 
 
 @click.command()
-@click.argument('xml', nargs=-1, type=click.Path(exists=True))
-@click.option('--debug', is_flag=True, hidden=True)
-def build_(xml: Tuple[Path, ...], debug: bool):
-    for file in xml:
-        start = datetime.now()
-        context = click.get_current_context()
+@click.argument('xml', nargs=1, type=click.Path(exists=True))
+@click.option('--test', type=str, required=False)
+@click.option('--debug', is_flag=True, hidden=True, default=False)
+def build_(xml: str, test: str, debug: bool):
+    xml = Path(xml)
+    c = Cache(xml)
 
-        p = Path(file)
-        c = Cache(p)
-        x = XML(c)
-        x.validate(p)
+    start = datetime.now()
+    context = click.get_current_context()
+
+    logger = logging.getLogger()
+    handlers = [
+        logging.FileHandler(filename=(c.cache_directory() / 'cardlatex.log').as_posix(), mode='w'),
+        logging.StreamHandler()
+    ]
+    for handler in handlers:
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
+
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    logging.info(f'cardlatex {version}\t{context.params}')
+
+    x = XML(c)
+    x.validate(xml)
+    x.build()
 
 
 
