@@ -34,7 +34,7 @@ class XML:
             file = self._cache.working_directory() / element['@file']
             assert file.exists(), FileNotFoundError(file)
 
-            self._tex.append(tex := Tex(file, element))
+            self._tex.append(tex := Tex(self._cache, file, element))
             texelements.append({
                 'type': element['@file'],
                 'file': element['@file'],
@@ -46,7 +46,7 @@ class XML:
 
     def build(self):
         for tex in self._tex:
-            tex.write(self._cache, is_draft=self._draft, is_print=self._print)
+            tex.write(is_draft=self._draft, is_print=self._print)
 
         for tex in self._tex:
-            tex.xelatex(self._cache, is_draft=self._draft, is_print=self._print)
+            tex.xelatex(is_draft=self._draft, is_print=self._print)

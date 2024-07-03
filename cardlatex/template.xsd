@@ -32,7 +32,13 @@
   </xs:element>
 
   <xs:attributeGroup name="tex">
-    <xs:attribute name="file" type="xs:string" use="required"/>
+    <xs:attribute name="file" use="required">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:pattern value=".+\.tex"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
     <xs:attribute name="dpi" type="xs:string" default="150"/>
     <xs:attribute name="spacing" type="measurement" default="0"/>
     <xs:attribute name="width" type="measurement" default="2.5in"/>

@@ -51,7 +51,7 @@
 	\coordinate (C) at (\cardx/2,-\cardy/2);
 }
 
-\newcounter{cardlatex}
+\newcounter{cardlatex}\stepcounter{cardlatex}
 \newenvironment{tikzcard}[3][0]{
 \tikzmath{
 	coordinate \card;

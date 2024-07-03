@@ -59,11 +59,14 @@ graphicpaths = r"""
 
 
 class Tex_:
-    def __init__(self, file: Path, attributes: dict):
+    def __init__(self, cache: Cache, file: Path, attributes: dict):
+        assert cache.working_directory() == file.parent, f'{file} should be in the same directory as the .xml file'
+        self._working_file = file.resolve()
+        self._cache_file = (cache.cache_directory() / file.name).with_suffix('.cardlatex.tex')
+
         with open(file, 'r') as f:
             self._tex = f.read()
 
-        self._name = file.name
         self._width = self._as_length(attributes['@width'])
         self._height = self._as_length(attributes['@height'])
         self._bleed = self._as_length(attributes['@bleed'])
@@ -90,10 +93,6 @@ class Tex_:
         assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
             ValueError(f'invalid measurement value "{value}"'))
         return value
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     @property
     def variables(self) -> frozenset:
@@ -134,7 +133,7 @@ class Tex_:
 
         return props
 
-    def write(self, cache: Cache, is_draft: bool, is_print: bool):
+    def write(self, is_draft: bool, is_print: bool):
         tex = {}
 
         t, rr = '', 0
@@ -158,7 +157,7 @@ class Tex_:
         for m in re.finditer(r'^(.*)(\\input\{([\w.]+)})', self._tex):
             l, r = m.span(2)
 
-            input_path = (cache.working_directory() / m.group(3)).with_suffix('.tex')
+            input_path = (self._working_file.parent / m.group(3)).with_suffix('.tex')
             if '%' in m.group(1) or not input_path.exists():
                 value = ''
             else:
@@ -213,14 +212,121 @@ class Tex_:
 
         tex['@documentend'] = '\n\\end{document}'
 
-        with open((cache.cache_directory() / self.name).with_suffix('.cardlatex.tex'), 'w') as f:
+        with open(self._cache_file, 'w') as f:
             for key, value in tex.items():
                 if not key.startswith('@'):
                     f.write('\n\n' + '%' * 68 + '\n% ' + key.upper() + '\n\n')
                 f.write(value)
 
-    def xelatex(self, cache: Cache, is_draft: bool, is_print: bool):
-        file = (cache.cache_directory() / self.name).with_suffix('.cardlatex.tex')
+    def xelatex(self, is_draft: bool, is_print: bool):
+        working_dir = self._working_file.parent
+        cache_dir = self._cache_file.parent
+        with open(self._cache_file) as cf, open(self._working_file) as wf:
+            tex = cf.read()
+            cardtex = wf.read()
+            _tex_ = ('\n' + tex).split('\n')
+            _cardtex_ = ('\n' + cardtex).split('\n')
+
+        ln_ww = max([len(str(len(x))) for x in [_cardtex_, _tex_]])
+        ln_w = lambda _: str(_).ljust(ln_ww, ' ')
+
+        cardtex_fb = {}
+        for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', cardtex, re.MULTILINE):
+            cardtex_fb[m.group(1)] = len(cardtex[:m.end()].split('\n'))
+
+        cardtex_rows: list[tuple[int, str | None, str | None]] = [(0, 'preamble', None)]
+        for m in re.finditer(r'% CARD (\d+), COPY \d+, (FRONT|BACK)\n', tex):
+            cardtex_rows.append((len(tex[:m.end()].split('\n')), f'row {m.group(1)}', m.group(2).lower()))
+        cardtex_rows.append((len(_tex_) + 1, None, None))
+
+        if (pdf_path := self._cache_file.with_suffix('.pdf')).exists():
+            os.remove(pdf_path)
+        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{self._cache_file.stem}".tex 2&>1'
+
+        try:
+            if os.name == 'nt':
+                process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cache_dir.as_posix())
+            else:
+                process = pexpect.spawn(cmd, cwd=cache_dir.as_posix(), echo=False)
+
+            directories = None
+            errors = 0
+            expects = [r'cardlatex@graphicpaths\r\n(.*?)\r',
+                       r'includegraphics@(.+?)\r',
+                       self._working_file.name.replace('.', r'\.') + r':(\d+):(.*)l\.\1',
+                       pexpect.EOF]
+            while True:
+                p = process.expect(expects)
+                if p == 0:  # r'cardlatex@graphicpaths\r\n(.*?)\r'
+                    directories = sorted(['.'] + [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group().decode())])
+                elif p == 1:  # r'includegraphics@(.+?)\r'
+                    assert directories is not None
+                    fn: str = process.match.group(1).decode()
+                    for d in directories + [None]:
+                        if (file := working_dir / d / fn).exists():
+                            if is_draft:
+                                if not (file_resampled := cache_dir / d / fn).exists():
+                                    self._resample(file, file_resampled)
+                                elif file.lstat().st_mtime_ns != file_resampled.lstat().st_mtime_ns:
+                                    self._resample(file, file_resampled)
+                            break
+                        if d is None:
+                            raise FileNotFoundError(fn)
+                elif p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
+                    ln, err = int(process.match.group(1)), process.match.group(2).decode().strip('\n ').replace('\r', '')
+                    ln_row, loc, fb = cardtex_rows[[ln >= r for r, _, _ in cardtex_rows].index(False) - 1]
+                    if fb is None:
+                        print('\n\t'.join([f'Error in preamble',
+                                           f'\n\tln. {ln} of compiled',
+                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           '\n\tTeX error message was',
+                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                    else:
+                        ln_cardtex = cardtex_fb[fb] + ln - ln_row
+                        print('\n\t'.join([f'Error in {loc} [{fb}]',
+                                           f'\n\tln. {ln_cardtex} of template',
+                                           *[ln_w(l) + ' >> ' + _cardtex_[l] for l in
+                                             range(ln_cardtex - 2, ln_cardtex + 3)],
+                                           f'\n\tln. {ln} of compiled',
+                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           f'\n\tTeX error message was',
+                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                    errors += 1
+                elif p == 3:  # EOF
+                    with open(log_path := self._cache_file.with_suffix('.log')) as f:
+                        log = f.read()
+
+                    names = ['.cardlatex.log', '.cardlatex.tex']
+                    if errors == 0:
+                        for name in names:
+                            if (path := self._working_file.with_suffix(name)).exists():
+                                os.remove(path)
+
+                        shutil.move(self._cache_file.with_suffix('.pdf'), self._working_file.with_suffix('.pdf'))
+                        m = re.search(r'Output written on (.+)pdf \((\d+)', log)
+                        logging.info(self._working_file.name + f' completed! ({m.group(2)} pages)')
+                    else:
+                        for path, name in zip([log_path, self._cache_file], names):
+                            shutil.copy(path, self._working_file.with_suffix(name))
+                        logging.info(self._working_file.name + f' failed! ({errors} error{"s" if errors > 1 else ""})')
+                    return 0 if errors == 0 else 1
+
+                process.sendline('')
+        except pexpect.TIMEOUT as e:
+            raise e
+        except Exception as e:
+            raise e
+
+    @staticmethod
+    def _resample(source: Path, target: Path):
+        lstat = source.lstat()
+        with WandImage(filename=source.resolve().as_posix()) as src:
+            with src.convert(source.suffix[1:]) as tar:
+                if lstat.st_size > 0 and lstat.st_size > 51200:  # in bytes
+                    tar.transform(resize=f'{round(100 * 51200 / lstat.st_size)}%')
+                target.parent.mkdir(parents=True, exist_ok=True)
+                tar.save(filename=target.as_posix())
+        os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
 
 
 class Tex:
