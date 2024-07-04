@@ -222,22 +222,22 @@ class Tex_:
         working_dir = self._working_file.parent
         cache_dir = self._cache_file.parent
         with open(self._cache_file) as cf, open(self._working_file) as wf:
-            tex = cf.read()
-            cardtex = wf.read()
-            _tex_ = ('\n' + tex).split('\n')
-            _cardtex_ = ('\n' + cardtex).split('\n')
+            cache_tex = cf.read()
+            cache_tex_ln = ('\n' + cache_tex).split('\n')
+            working_tex = wf.read()
+            working_tex_ln = ('\n' + working_tex).split('\n')
 
-        ln_ww = max([len(str(len(x))) for x in [_cardtex_, _tex_]])
+        ln_ww = max([len(str(len(x))) for x in [working_tex_ln, cache_tex_ln]])
         ln_w = lambda _: str(_).ljust(ln_ww, ' ')
 
-        cardtex_fb = {}
-        for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', cardtex, re.MULTILINE):
-            cardtex_fb[m.group(1)] = len(cardtex[:m.end()].split('\n'))
+        working_tex_content_start = {}
+        for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', working_tex, re.MULTILINE):
+            working_tex_content_start[m.group(1)] = len(working_tex[:m.end()].split('\n'))
 
-        cardtex_rows: list[tuple[int, str | None, str | None]] = [(0, 'preamble', None)]
-        for m in re.finditer(r'% CARD (\d+), COPY \d+, (FRONT|BACK)\n', tex):
-            cardtex_rows.append((len(tex[:m.end()].split('\n')), f'row {m.group(1)}', m.group(2).lower()))
-        cardtex_rows.append((len(_tex_) + 1, None, None))
+        cache_tex_content_start: list[tuple[int, str | None, str | None]] = [(0, 'preamble', None)]
+        for m in re.finditer(r'% CARD (\d+), COPY \d+, (FRONT|BACK)\n', cache_tex):
+            cache_tex_content_start.append((len(cache_tex[:m.end()].split('\n')), f'row {m.group(1)}', m.group(2).lower()))
+        cache_tex_content_start.append((len(cache_tex_ln) + 1, None, None))
 
         if (pdf_path := self._cache_file.with_suffix('.pdf')).exists():
             os.remove(pdf_path)
@@ -262,6 +262,7 @@ class Tex_:
                 elif p == 1:  # r'includegraphics@(.+?)\r'
                     assert directories is not None
                     fn: str = process.match.group(1).decode()
+                    files = []
                     for d in directories + [None]:
                         if (file := working_dir / d / fn).exists():
                             if is_draft:
@@ -270,27 +271,31 @@ class Tex_:
                                 elif file.lstat().st_mtime_ns != file_resampled.lstat().st_mtime_ns:
                                     self._resample(file, file_resampled)
                             break
+                        files.append(file.as_posix())
                         if d is None:
-                            raise FileNotFoundError(fn)
+                            # immediately exit process, missing image errors take long to process
+                            process.terminate()
+                            raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n' + '\n>\t'.join(files))
                 elif p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
-                    ln, err = int(process.match.group(1)), process.match.group(2).decode().strip('\n ').replace('\r', '')
-                    ln_row, loc, fb = cardtex_rows[[ln >= r for r, _, _ in cardtex_rows].index(False) - 1]
-                    if fb is None:
-                        print('\n\t'.join([f'Error in preamble',
+                    ln = int(process.match.group(1))
+                    error = process.match.group(2).decode().strip('\n ').replace('\r', '')
+                    ln_row, loc, frontback = cache_tex_content_start[[ln >= r for r, _, _ in cache_tex_content_start].index(False) - 1]
+                    if frontback is None:
+                        logging.error('\n\t'.join([f'Error in preamble',
                                            f'\n\tln. {ln} of compiled',
-                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
                                            '\n\tTeX error message was',
-                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                                           *[ln_w('') + ' >> ' + t for t in error.split('\n')]]) + '\n')
                     else:
-                        ln_cardtex = cardtex_fb[fb] + ln - ln_row
-                        print('\n\t'.join([f'Error in {loc} [{fb}]',
+                        ln_cardtex = working_tex_content_start[frontback] + ln - ln_row
+                        logging.error('\n\t'.join([f'Error in {loc} [{frontback}]',
                                            f'\n\tln. {ln_cardtex} of template',
-                                           *[ln_w(l) + ' >> ' + _cardtex_[l] for l in
+                                           *[ln_w(l) + ' >> ' + working_tex_ln[l] for l in
                                              range(ln_cardtex - 2, ln_cardtex + 3)],
                                            f'\n\tln. {ln} of compiled',
-                                           *[ln_w(l) + ' >> ' + _tex_[l] for l in range(ln - 2, ln + 3)],
+                                           *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
                                            f'\n\tTeX error message was',
-                                           *[ln_w('') + ' >> ' + t for t in err.split('\n')]]) + '\n')
+                                           *[ln_w('') + ' >> ' + t for t in error.split('\n')]]) + '\n')
                     errors += 1
                 elif p == 3:  # EOF
                     with open(log_path := self._cache_file.with_suffix('.log')) as f:
@@ -298,9 +303,8 @@ class Tex_:
 
                     names = ['.cardlatex.log', '.cardlatex.tex']
                     if errors == 0:
-                        for name in names:
-                            if (path := self._working_file.with_suffix(name)).exists():
-                                os.remove(path)
+                        # remove existing .cardlatex. files caused by errors from a prior run
+                        [os.remove(self._working_file.with_suffix(name)) for name in names if self._working_file.with_suffix(name).exists()]
 
                         shutil.move(self._cache_file.with_suffix('.pdf'), self._working_file.with_suffix('.pdf'))
                         m = re.search(r'Output written on (.+)pdf \((\d+)', log)

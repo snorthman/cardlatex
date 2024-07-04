@@ -4,16 +4,33 @@
            vc:minVersion="1.1">
   <xs:element name="cardlatex">
     <xs:complexType>
-      <xs:sequence maxOccurs="unbounded">
+      <xs:sequence>
         {% if not texelements %}
-          <xs:element name="tex" type="__init__"/>
+          <xs:element name="tex" type="__init__" maxOccurs="unbounded"/>
         {% else %}
-          <xs:element name="tex">
+          <xs:element name="tex" maxOccurs="unbounded">
           {% for texelement in texelements %}
             <xs:alternative test="@file = '{{ texelement.file }}'" type="{{ texelement.type }}" />
           {% endfor %}
           </xs:element>
         {% endif %}
+        <xs:element name="keywords" minOccurs="0" maxOccurs="unbounded">
+        <!--     replace line-by-line, top-to-bottom, but text replaced by the first is ignored in subsequent keyword elements     -->
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="keyword" maxOccurs="unbounded">
+                  <xs:complexType>
+                    <xs:attribute name="key" type="xs:string" use="required"/>
+                    <xs:attribute name="value" type="xs:string" use="required"/>
+                  </xs:complexType>
+                </xs:element>
+              </xs:sequence>
+              <!--     replace full paragraph rather than line-by-line     -->
+              <xs:attribute name="multiline" type="xs:boolean" default="false"/>
+              <!--     ignore lines/paragraphs that start with this string     -->
+              <xs:attribute name="skip-character" type="xs:string" default="@"/>
+          </xs:complexType>
+        </xs:element>
       </xs:sequence>
       <!--   use low resolution images, respect 'test' attributes and ignore 'copies' attributes   -->
       <xs:attribute name="draft" type="xs:boolean" use="required"/>

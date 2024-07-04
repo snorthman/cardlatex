@@ -18,4 +18,7 @@
 			<art>background_combine</art>
 		</card>
 	</tex>
+	<keywords break="true">
+		<keyword key="^$" value="EMPTY!"/>
+	</keywords>
 </cardlatex>
