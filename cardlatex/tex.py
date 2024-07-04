@@ -59,6 +59,11 @@ graphicpaths = r"""
 
 
 class Tex_:
+    class Keywords:
+        def __init__(self, **kwargs):
+            self._m: bool = kwargs['@multiline']
+            self._skip: str | None = kwargs.get('@skip-character', None)
+
     def __init__(self, cache: Cache, file: Path, attributes: dict):
         assert cache.working_directory() == file.parent, f'{file} should be in the same directory as the .xml file'
         self._working_file = file.resolve()
@@ -133,7 +138,7 @@ class Tex_:
 
         return props
 
-    def write(self, is_draft: bool, is_print: bool):
+    def write(self, keywords: list, is_draft: bool, is_print: bool):
         tex = {}
 
         t, rr = '', 0

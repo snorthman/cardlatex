@@ -28,7 +28,7 @@
               <!--     replace full paragraph rather than line-by-line     -->
               <xs:attribute name="multiline" type="xs:boolean" default="false"/>
               <!--     ignore lines/paragraphs that start with this string     -->
-              <xs:attribute name="skip-character" type="xs:string" default="@"/>
+              <xs:attribute name="skip-character" type="xs:string"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
