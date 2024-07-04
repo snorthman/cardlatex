@@ -12,9 +12,11 @@ class XML:
     def __init__(self, cache: Cache):
         self._cache = cache
         self._tex: list[Tex] = []
+
         self._draft = None
         self._print = None
         self._paper = None
+        self._kwargs = []
 
     def validate(self, file: Path):
         with open(file) as f:
@@ -28,6 +30,7 @@ class XML:
         self._draft = xml_dict['@draft']
         self._print = xml_dict['@print']
         self._paper = xml_dict.get('@paper', None)
+        self._kwargs = xml_dict.get('keywords', [])
 
         texelements = []
         for element in xml_dict['tex']:
@@ -46,7 +49,7 @@ class XML:
 
     def build(self):
         for tex in self._tex:
-            tex.write(is_draft=self._draft, is_print=self._print)
+            tex.write(self._kwargs, is_draft=self._draft, is_print=self._print)
 
         for tex in self._tex:
             tex.xelatex(is_draft=self._draft, is_print=self._print)

@@ -63,6 +63,40 @@ class Tex_:
         def __init__(self, **kwargs):
             self._m: bool = kwargs['@multiline']
             self._skip: str | None = kwargs.get('@skip-character', None)
+            self._keywords = {kw['@key']: kw['@value'] for kw in kwargs['keyword']}
+
+        def _apply(self, string: str):
+            replace: dict[int, tuple[int, str]] = {}
+            reserved: set[int] = set()
+            for key, word in self._keywords.items():
+                for m in re.finditer(key, string):
+                    w = word
+                    while mm := re.search(r'#(\d)', w):
+                        wl, _ = mm.span()
+                        w = w[:wl] + m.group(int(mm.group(1))) + w[wl + 2:]
+
+                    # issue if string is empty!
+                    if not reserved.intersection(lr := set(range(*m.span()))):
+                        replace[min(lr)] = max(lr) + 1, w
+
+            # guaranteed no overlap in replace keys now
+            result, r = '', 0
+            for l in sorted(replace.keys()):
+                result += string[r:l]
+                r, word = replace[l]
+                result += word
+            result += string[r:]
+
+            return result
+
+        def apply(self, string: str):
+            string = [string] if self._m else string.split('\n')
+            for s in range(len(string)):
+                if self._skip is not None and string[s].startswith(self._skip):
+                    continue
+                else:
+                    string[s] = self._apply(string[s])
+            return '\n'.join(string)
 
     def __init__(self, cache: Cache, file: Path, attributes: dict):
         assert cache.working_directory() == file.parent, f'{file} should be in the same directory as the .xml file'
@@ -139,6 +173,7 @@ class Tex_:
         return props
 
     def write(self, keywords: list, is_draft: bool, is_print: bool):
+        keywords = [self.Keywords(**kwargs) for kwargs in keywords]
         tex = {}
 
         t, rr = '', 0
@@ -201,6 +236,8 @@ class Tex_:
                             value = ''
                         else:
                             value = variables[var].replace('\t', ' ').strip('\n\t ')
+                            for kw in keywords:
+                                value = kw.apply(value)
                             # apply keywords to value here
 
                         text = text.replace(f'<${var}$>', value)
