@@ -66,28 +66,30 @@ class Tex_:
             self._keywords = {kw['@key']: kw['@value'] for kw in kwargs['keyword']}
 
         def _apply(self, string: str):
-            replace: dict[int, tuple[int, str]] = {}
+            replace: dict[tuple[int, int], str] = {}
             reserved: set[int] = set()
             for key, word in self._keywords.items():
                 for m in re.finditer(key, string):
+                    if string == '':
+                        return word
+
                     w = word
                     while mm := re.search(r'#(\d)', w):
-                        wl, _ = mm.span()
-                        w = w[:wl] + m.group(int(mm.group(1))) + w[wl + 2:]
+                        l, r = mm.span()
+                        w = w[:l] + m.group(int(mm.group(1))) + w[r:]
 
-                    # issue if string is empty!
-                    if not reserved.intersection(lr := set(range(*m.span()))):
-                        replace[min(lr)] = max(lr) + 1, w
+                    reservation = set(range(*m.span()))
+                    if not reserved.intersection(reservation):
+                        replace[(min(reservation), max(reservation))] = w
+                        reserved.update(reservation)
 
             # guaranteed no overlap in replace keys now
-            result, r = '', 0
-            for l in sorted(replace.keys()):
-                result += string[r:l]
-                r, word = replace[l]
-                result += word
-            result += string[r:]
+            c, result = 0, ''
+            for l, r in sorted(replace, key=lambda a: a[0]):
+                result += string[c:l] + replace[(l, r)]
+                c = r + 1
 
-            return result
+            return result + string[c:]
 
         def apply(self, string: str):
             string = [string] if self._m else string.split('\n')
@@ -306,6 +308,11 @@ class Tex_:
                     fn: str = process.match.group(1).decode()
                     files = []
                     for d in directories + [None]:
+                        if d is None:
+                            # immediately exit process, missing image errors take long to process
+                            process.kill(15)
+                            raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n>\t' + '\n>\t'.join(files))
+
                         if (file := working_dir / d / fn).exists():
                             if is_draft:
                                 if not (file_resampled := cache_dir / d / fn).exists():
@@ -314,10 +321,6 @@ class Tex_:
                                     self._resample(file, file_resampled)
                             break
                         files.append(file.as_posix())
-                        if d is None:
-                            # immediately exit process, missing image errors take long to process
-                            process.terminate()
-                            raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n' + '\n>\t'.join(files))
                 elif p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
                     ln = int(process.match.group(1))
                     error = process.match.group(2).decode().strip('\n ').replace('\r', '')
