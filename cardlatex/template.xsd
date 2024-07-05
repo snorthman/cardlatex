@@ -27,8 +27,6 @@
               </xs:sequence>
               <!--     replace full paragraph rather than line-by-line     -->
               <xs:attribute name="multiline" type="xs:boolean" default="false"/>
-              <!--     ignore lines/paragraphs that start with this string     -->
-              <xs:attribute name="skip-character" type="xs:string"/>
           </xs:complexType>
         </xs:element>
       </xs:sequence>
@@ -106,9 +104,9 @@
     <xs:sequence maxOccurs="unbounded">
       <xs:element name="card" maxOccurs="unbounded">
         <xs:complexType>
-          <xs:all minOccurs="0">
+          <xs:all>
             {% for variable in texelement.variables %}
-            <xs:element minOccurs="0" name="{{ variable }}" type="xs:string"/>
+            <xs:element minOccurs="0" name="{{ variable }}" type="carditem"/>
             {% endfor %}
           </xs:all>
           <xs:attributeGroup ref="card"/>
@@ -118,4 +116,12 @@
     <xs:attributeGroup ref="tex"/>
   </xs:complexType>
   {% endfor %}
+
+  <xs:complexType name="carditem">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="keywords" type="xs:boolean" default="false"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
 </xs:schema>

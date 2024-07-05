@@ -19,7 +19,7 @@
 		</card>
 	</tex>
 <!--	problem: if you want multiple skip, you can only skip one block...-->
-	<keywords skip-character="@">
+	<keywords>
 		<keyword key="^$" value="\blockmargin{}"/>
 		<keyword key="^.+$" value="\block{#0}"/>
 	</keywords>
