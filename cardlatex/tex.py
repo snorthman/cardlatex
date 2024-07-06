@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import shutil
 from pathlib import Path
 
 import pexpect
@@ -9,6 +8,7 @@ import pexpect.popen_spawn
 from wand.image import Image as WandImage
 
 from .cache import Cache
+from .keywords import Keywords
 from .template import template_tex
 
 graphicpaths = r"""
@@ -19,20 +19,34 @@ graphicpaths = r"""
 
 class Tex:
     def __init__(self, cache: Cache, file: Path):
-        assert cache.working_directory() == file.parent, f'{file} should be in the same directory as the .xml file'
+        assert cache.working_directory == file.parent, f'{file} should be in the same directory as the .xml file'
+        self._xml_file = cache.file_xml
         self._working_file = file.resolve()
-        self._cache_file = (cache.cache_directory() / file.name).with_suffix('.cardlatex.tex')
+        self._cache_file = (cache.cache_directory / file.name).with_suffix('.cardlatex.tex')
 
         with open(file, 'r') as f:
             self._tex = f.read()
         self._attr = {}
+        self._resampled = set()
 
     def __str__(self):
         return f'{self._working_file.as_posix()} | {self._cache_file.as_posix()}'
 
     @property
-    def name(self) -> str:
-        return self._working_file.name
+    def name(self) -> Path:
+        return Path(self._working_file.name)
+
+    @property
+    def resampled(self) -> frozenset[Path]:
+        return frozenset(self._resampled)
+
+    @property
+    def has_back(self) -> bool:
+        return self._attr['props']['back'] is not None
+
+    @property
+    def output_name(self) -> str:
+        return self._working_file.with_suffix('.cardlatex.pdf').name
 
     def set_attributes(self, attributes: dict):
         props = {'front': None, 'back': None}
@@ -184,45 +198,39 @@ class Tex:
     def xelatex(self, is_draft: bool):
         working_dir = self._working_file.parent
         cache_dir = self._cache_file.parent
-        with open(self._cache_file) as cf, open(self._working_file) as wf:
+        with open(self._cache_file) as cf:
             cache_tex = cf.read()
             cache_tex_ln = ('\n' + cache_tex).split('\n')
-            working_tex = wf.read()
-            working_tex_ln = ('\n' + working_tex).split('\n')
 
-        _ = max([len(str(len(x))) for x in [working_tex_ln, cache_tex_ln]])
-        ln_w = lambda _: str(_).ljust(_, ' ')
-
-        working_tex_content_start = {}
-        for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', working_tex, re.MULTILINE):
-            working_tex_content_start[m.group(1)] = len(working_tex[:m.end()].split('\n'))
-
-        cache_tex_content_start: list[tuple[int, str | None, str | None]] = [(0, 'preamble', None)]
+        cache_cards = []
         for m in re.finditer(r'% CARD (\d+), COPY \d+, (FRONT|BACK)\n', cache_tex):
-            cache_tex_content_start.append((len(cache_tex[:m.end()].split('\n')), f'row {m.group(1)}', m.group(2).lower()))
-        cache_tex_content_start.append((len(cache_tex_ln) + 1, None, None))
+            cache_cards.append({
+                'card': m.group(1),
+                'side': m.group(2),
+                'ln': len(cache_tex[:m.end()].split('\n'))
+            })
 
         if (pdf_path := self._cache_file.with_suffix('.pdf')).exists():
             os.remove(pdf_path)
         cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{self._cache_file.stem}".tex 2&>1'
 
-        try:
-            if os.name == 'nt':
-                process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cache_dir.as_posix())
-            else:
-                process = pexpect.spawn(cmd, cwd=cache_dir.as_posix(), echo=False)
+        if os.name == 'nt':
+            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cache_dir.as_posix())
+        else:
+            process = pexpect.spawn(cmd, cwd=cache_dir.as_posix(), echo=False)
 
+        try:
             directories = None
-            errors = 0
             expects = [r'cardlatex@graphicpaths\r\n(.*?)\r',
                        r'includegraphics@(.+?)\r',
-                       self._working_file.name.replace('.', r'\.') + r':(\d+):(.*)l\.\1',
+                       self._cache_file.name.replace('.', r'\.') + r':(\d+): (.*)l\.\1',
                        pexpect.EOF]
             while True:
                 p = process.expect(expects)
-                if p == 0:  # r'cardlatex@graphicpaths\r\n(.*?)\r'
+
+                if p == 0:
                     directories = sorted(['.'] + [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group().decode())])
-                elif p == 1:  # r'includegraphics@(.+?)\r'
+                elif p == 1:
                     assert directories is not None
                     fn: str = process.match.group(1).decode()
                     files = []
@@ -238,51 +246,43 @@ class Tex:
                                     self._resample(file, file_resampled)
                                 elif file.lstat().st_mtime_ns != file_resampled.lstat().st_mtime_ns:
                                     self._resample(file, file_resampled)
+                                self._resampled.add(file_resampled)
                             break
                         files.append(file.as_posix())
-                elif p == 2:  # tex_path.name + r':(\d+):(.*)l\.\1'
-                    ln = int(process.match.group(1))
-                    error = process.match.group(2).decode().strip('\n ').replace('\r', '')
-                    ln_row, loc, frontback = cache_tex_content_start[[ln >= r for r, _, _ in cache_tex_content_start].index(False) - 1]
-                    if frontback is None:
-                        error_text = [f'Error in preamble',
-                                      f'\n\tln. {ln} of compiled',
-                                      *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
-                                      '\n\tTeX error message was',
-                                      *[ln_w('') + ' >> ' + t for t in error.split('\n')]]
-                    else:
-                        ln_cardtex = working_tex_content_start[frontback] + ln - ln_row
-                        error_text = [f'Error in {loc} [{frontback}]',
-                                      f'\n\tln. {ln_cardtex} of template',
-                                      *[ln_w(l) + ' >> ' + working_tex_ln[l] for l in
-                                        range(ln_cardtex - 2, ln_cardtex + 3)],
-                                      f'\n\tln. {ln} of compiled',
-                                      *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
-                                      f'\n\tTeX error message was',
-                                      *[ln_w('') + ' >> ' + t for t in error.split('\n')]]
-                    logging.error('\n\t'.join(error_text) + '\n')
-                    errors += 1
+                elif p == 2:
+                    xelatex_error = process.match.group(2).decode().replace('\r', '').strip('\n ')
+                    cache_error_ln = int(process.match.group(1)) - 1  # somehow, the line number is always off by +1
+
+                    cache_error_lns = [f'  >> {cache_tex_ln[_]}' for _ in range(cache_error_ln - 2, cache_error_ln) if _ >= 0]
+                    cache_error_lns.append(f'  >> {cache_tex_ln[cache_error_ln]}')
+                    cache_error_lns.extend(
+                        [f'  >> {cache_tex_ln[_]}' for _ in range(cache_error_ln + 1, cache_error_ln + 3) if _ < len(cache_tex_ln)])
+
+                    cache_card = -1
+                    for c, card in enumerate(cache_cards):
+                        if cache_error_ln >= card['ln']:
+                            cache_card = c
+                            if c == len(cache_cards) - 1 or cache_error_ln < cache_cards[c + 1]['ln']:
+                                break
+
+                    loc = 'preamble'
+                    if cache_card > -1:
+                        card, side, _ = tuple(cache_cards[cache_card].values())
+                        loc = f'card {card}[{side.lower()}]'
+                    msg = '\n'.join([f'Error in {self.name}: {loc}',
+                                     *cache_error_lns,
+                                     'Error message was',
+                                     *[f'  >> {_}' for _ in xelatex_error.split('\n')]])
+                    process.kill(15)
+                    raise RuntimeError(msg)
                 elif p == 3:  # EOF
-                    with open(log_path := self._cache_file.with_suffix('.log')) as f:
+                    with open(self._cache_file.with_suffix('.log')) as f:
                         log = f.read()
-
-                    names = ['.cardlatex.log', '.cardlatex.tex']
-                    if errors == 0:
-                        # remove existing .cardlatex. files caused by errors from a prior run
-                        [os.remove(self._working_file.with_suffix(name)) for name in names if self._working_file.with_suffix(name).exists()]
-
-                        shutil.move(self._cache_file.with_suffix('.pdf'), self._working_file.with_suffix('.pdf'))
-                        m = re.search(r'Output written on (.+)pdf \((\d+)', log)
-                        logging.info(self._working_file.name + f' completed! ({m.group(2)} pages)')
-                    else:
-                        for path, name in zip([log_path, self._cache_file], names):
-                            shutil.copy(path, self._working_file.with_suffix(name))
-                        logging.info(self._working_file.name + f' failed! ({errors} error{"s" if errors > 1 else ""})')
+                    m = re.search(r'Output written on (.+)pdf \((\d+)', log)
+                    logging.info(self._working_file.name + f' completed! ({m.group(2)} pages)')
                     return
 
                 process.sendline('')
-        except pexpect.TIMEOUT as e:
-            raise e
         except Exception as e:
             raise e
 
@@ -296,45 +296,3 @@ class Tex:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tar.save(filename=target.as_posix())
         os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
-
-
-class Keywords:
-    def __init__(self, **kwargs):
-        self._m: bool = kwargs['@multiline']
-        self._keywords = {kw['@key']: kw['@value'] for kw in kwargs['keyword']}
-
-    def __str__(self):
-        m = ' (multiline)' if self._m else ''
-        return f'Keywords {m}: [' + ', '.join(self._keywords.keys()) + ']'
-
-    def _apply(self, string: str):
-        replace: dict[tuple[int, int], str] = {}
-        reserved: set[int] = set()
-        for key, word in self._keywords.items():
-            for m in re.finditer(key, string):
-                if string == '':
-                    return word
-
-                w = word
-                while mm := re.search(r'#(\d)', w):
-                    l, r = mm.span()
-                    w = w[:l] + m.group(int(mm.group(1))) + w[r:]
-
-                reservation = set(range(*m.span()))
-                if not reserved.intersection(reservation):
-                    replace[(min(reservation), max(reservation))] = w
-                    reserved.update(reservation)
-
-        # guaranteed no overlap in replace keys now
-        c, result = 0, ''
-        for l, r in sorted(replace, key=lambda a: a[0]):
-            result += string[c:l] + replace[(l, r)]
-            c = r + 1
-
-        return result + string[c:]
-
-    def apply(self, string: str):
-        string_list = [string] if self._m else string.split('\n')
-        for s in range(len(string_list)):
-            string_list[s] = self._apply(string_list[s])
-        return '\n'.join(string_list)

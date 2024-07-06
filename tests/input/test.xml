@@ -3,8 +3,8 @@
 	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in" test="1">
 		<!--	Poker size	-->
 		<card copies="2">
-			<art>@background</art>
-			<title keywords="true">hello</title>
+			<art>background</art>
+			<title>hello</title>
 			<text>
 				no
 
@@ -18,7 +18,6 @@
 			<art>background_combine</art>
 		</card>
 	</tex>
-<!--	problem: if you want multiple skip, you can only skip one block...-->
 	<keywords>
 		<keyword key="^$" value="\blockmargin{}"/>
 		<keyword key="^.+$" value="\block{#0}"/>

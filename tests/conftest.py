@@ -5,7 +5,7 @@ import pytest
 from click import BaseCommand
 from click.testing import CliRunner
 
-from cardlatex.__main__ import build_
+from cardlatex.__main__ import cardlatex
 
 
 @pytest.fixture()
@@ -23,7 +23,7 @@ def test_dir(request):
 def click():
     def f(*args, **kwargs):
         expected_exception = None
-        func: BaseCommand = build_
+        func: BaseCommand = cardlatex
 
         arguments = list(args)
         for key, value in kwargs.items():

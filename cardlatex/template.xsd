@@ -38,8 +38,7 @@
       <xs:attribute name="paper">
         <xs:simpleType>
           <xs:restriction base="xs:string">
-            <xs:enumeration value="A3"/>
-            <xs:enumeration value="A4"/>
+            <xs:enumeration value="auto"/>
           </xs:restriction>
         </xs:simpleType>
       </xs:attribute>

@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = '0.6.0'
+version = '1.0.0'
 
 if __name__ == '__main__':
     setup(
@@ -10,19 +10,17 @@ if __name__ == '__main__':
         package_data={"cardlatex": ["*.tex"]},
         url=r'https://github.com/snorthman/cardlatex',
         license='MIT License',
-        author='Stan Noordman',
+        author='C.R. Noordman',
         author_email='snorthman1@gmail.com',
-        description='cardlatex is a XeLaTeX wrapper which compiles TeX from specific templated .tex and .xlsx files.',
+        description='cardlatex is a XeLaTeX wrapper which compiles TeX from specifically templated .tex and .xml files.',
         python_requires='>=3.10, <4',
         install_requires=[
-            'click',
-            'openpyxl',
-            'pandas',
-            'wand',
-            'pikepdf',
-            'pexpect',
-            'xmlschema',
-            'jinja2'
+            'click~=8.1',
+            'wand~=0.6',
+            'pikepdf~=8.4',
+            'pexpect~=4.9',
+            'xmlschema~=3.3',
+            'jinja2~=3.1'
         ],
         extras_require={
             'dev': [
@@ -33,7 +31,7 @@ if __name__ == '__main__':
         },
         entry_points={
             'console_scripts': [
-                'cardlatex = cardlatex.__main__:build',
+                'cardlatex = cardlatex.__main__:cardlatex',
             ],
         }
     )

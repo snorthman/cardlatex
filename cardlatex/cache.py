@@ -18,8 +18,10 @@ class Cache:
     def file_xml(self) -> Path:
         return self._file
 
+    @property
     def working_directory(self) -> Path:
         return self._wd
 
+    @property
     def cache_directory(self) -> Path:
         return self._cache

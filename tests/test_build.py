@@ -10,7 +10,7 @@ from click import BaseCommand
 from click.testing import CliRunner
 from pikepdf import Pdf
 
-from cardlatex.__main__ import build
+from cardlatex.__main__ import cardlatex
 from cardlatex.tex import Tex
 
 args_build_params = [['all'], ['combine'], ['print'], ['draft']]
@@ -92,7 +92,7 @@ def run(func: Callable | BaseCommand, expected_exception: Exception | None, *arg
 
 def test_build(args_build: tuple[str, str], kwargs_build: dict):
     tex_files, xlsx_name = args_build
-    run(build, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
+    run(cardlatex, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
     output_dir = Path('./tests/output')
     outputs = [output_dir / 'test_0.pdf']
 
@@ -123,18 +123,18 @@ def test_build(args_build: tuple[str, str], kwargs_build: dict):
     try:
         assert actual == expected
     except:
-        run(build, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
+        run(cardlatex, None, *prepare(xlsx_name, *tex_files), **kwargs_build)
 
 
 def test_build_expected_exception(args_build_fail: tuple[str, str, Exception]):
     tex_files, xlsx_name, expected_exception = args_build_fail
-    run(build, expected_exception, *prepare(xlsx_name, *tex_files))
+    run(cardlatex, expected_exception, *prepare(xlsx_name, *tex_files))
 
 
 def test_cache(args_build: tuple[str, str]):
     tex_files, xlsx_name = args_build
 
-    run(build, None, *(tex_files_prepared := prepare(xlsx_name, *tex_files)))
+    run(cardlatex, None, *(tex_files_prepared := prepare(xlsx_name, *tex_files)))
 
     stats = {}
     for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
@@ -144,7 +144,7 @@ def test_cache(args_build: tuple[str, str]):
                 if file.suffix:
                     stats[file] = file.stat().st_mtime_ns
 
-    run(build, None, *tex_files_prepared)
+    run(cardlatex, None, *tex_files_prepared)
 
     for cache in [Tex.get_cache_dir(tex_file) / 'art' for tex_file in tex_files_prepared]:
         for directory, _, filenames in os.walk(cache):
@@ -155,7 +155,7 @@ def test_cache(args_build: tuple[str, str]):
 
 
 def test_build_specific():
-    run(build, None, *prepare('copies', *['default']), **{'all': ''})
+    run(cardlatex, None, *prepare('copies', *['default']), **{'all': ''})
 
 
 temp = Path('./tests/input/temp')
@@ -163,4 +163,4 @@ temp = Path('./tests/input/temp')
 
 @pytest.mark.skipif(temp.exists() and len(list(temp.iterdir())) == 0, reason='No temp files found')
 def test_build_temp():
-    run(build, None, './tests/input/temp/card.tex', '--draft')
+    run(cardlatex, None, './tests/input/temp/card.tex', '--draft')

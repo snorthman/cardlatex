@@ -28,17 +28,16 @@ def find_crop(paper_sz, box_sz):
     return float(crop), m
 
 
-def combine_pdf(*files: Path) -> Path:
-    pdfs = [Pdf.open(file) for file in files]
+def combine_pdf(pdfs: list[Path]):
     pdf_output = Pdf.new()
-
-    for pdf in pdfs:
+    for pdf in [Pdf.open(file) for file in pdfs]:
         for page in pdf.pages:
             pdf_output.pages.append(page)
         pdf.close()
 
-    pdf_output.save(files[0])
-    return files[0]
+    pdf_file = pdfs[0].parent / '.cardlatex.pdf'
+    pdf_output.save(pdf_file)
+    return pdf_file
 
 
 def grid_pdf(file: Path, has_back: bool = False):
