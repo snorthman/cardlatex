@@ -4,7 +4,7 @@
 		<!--	Poker size	-->
 		<card copies="2">
 			<art>@background</art>
-			<title>@hello</title>
+			<title keywords="true">hello</title>
 			<text>
 				no
 

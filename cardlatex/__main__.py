@@ -15,32 +15,53 @@ from .xml import XML
 from .cache import Cache
 
 
+class CustomFormatter(logging.Formatter):
+    prefix = '                          | '
+
+    def format(self, record):
+        return f'{self.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S")} {record.levelname:<5} | ' + f'\n{self.prefix}'.join(record.msg.split('\n'))
+
+
 @click.command()
 @click.argument('xml', nargs=1, type=click.Path(exists=True))
 @click.option('--test', type=str, required=False)
 @click.option('--debug', is_flag=True, hidden=True, default=False)
 def build_(xml: str, test: str, debug: bool):
-    xml = Path(xml)
     c = Cache(xml)
 
     start = datetime.now()
-    context = click.get_current_context()
 
+    logging_file = (c.cache_directory() / 'cardlatex.log').as_posix()
     logger = logging.getLogger()
     handlers = [
-        logging.FileHandler(filename=(c.cache_directory() / 'cardlatex.log').as_posix(), mode='w'),
+        logging.FileHandler(filename=logging_file, mode='w'),
         logging.StreamHandler()
     ]
     for handler in handlers:
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        handler.setFormatter(CustomFormatter())
         logger.addHandler(handler)
 
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
-    logging.info(f'cardlatex {version}\t{context.params}')
 
-    x = XML(c)
-    x.validate(xml)
-    x.build()
+    logging_test = f' --test {test}' if test else ''
+    logging_debug = f' --debug' if debug else ''
+    logging.info(f'cardlatex ({version}) {xml}{logging_test}{logging_debug}')
+
+    logging_result = ''
+    try:
+        x = XML(c)
+        x.validate()
+        x.build()
+    except Exception as e:
+        logging.error(str(e))
+        logging_result = ' with errors'
+    finally:
+        logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
+        for handler in logger.handlers:
+            handler.close()
+            logger.removeHandler(handler)
+
+        shutil.move(logging_file, c.working_directory() / (c.file_xml.name + '.log'))
 
 
 

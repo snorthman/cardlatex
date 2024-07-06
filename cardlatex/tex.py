@@ -18,47 +18,6 @@ graphicpaths = r"""
 
 
 class Tex:
-    class Keywords:
-        def __init__(self, **kwargs):
-            self._m: bool = kwargs['@multiline']
-            self._skip: str | None = kwargs.get('@skip-character', None)
-            self._keywords = {kw['@key']: kw['@value'] for kw in kwargs['keyword']}
-
-        def _apply(self, string: str):
-            replace: dict[tuple[int, int], str] = {}
-            reserved: set[int] = set()
-            for key, word in self._keywords.items():
-                for m in re.finditer(key, string):
-                    if string == '':
-                        return word
-
-                    w = word
-                    while mm := re.search(r'#(\d)', w):
-                        l, r = mm.span()
-                        w = w[:l] + m.group(int(mm.group(1))) + w[r:]
-
-                    reservation = set(range(*m.span()))
-                    if not reserved.intersection(reservation):
-                        replace[(min(reservation), max(reservation))] = w
-                        reserved.update(reservation)
-
-            # guaranteed no overlap in replace keys now
-            c, result = 0, ''
-            for l, r in sorted(replace, key=lambda a: a[0]):
-                result += string[c:l] + replace[(l, r)]
-                c = r + 1
-
-            return result + string[c:]
-
-        def apply(self, string: str):
-            string = [string] if self._m else string.split('\n')
-            for s in range(len(string)):
-                if self._skip is not None and string[s].startswith(self._skip):
-                    continue
-                else:
-                    string[s] = self._apply(string[s])
-            return '\n'.join(string)
-
     def __init__(self, cache: Cache, file: Path):
         assert cache.working_directory() == file.parent, f'{file} should be in the same directory as the .xml file'
         self._working_file = file.resolve()
@@ -67,6 +26,13 @@ class Tex:
         with open(file, 'r') as f:
             self._tex = f.read()
         self._attr = {}
+
+    def __str__(self):
+        return f'{self._working_file.as_posix()} | {self._cache_file.as_posix()}'
+
+    @property
+    def name(self) -> str:
+        return self._working_file.name
 
     def set_attributes(self, attributes: dict):
         props = {'front': None, 'back': None}
@@ -171,20 +137,18 @@ class Tex:
         tex['document'] = '\\begin{document}\n\n'
         tex['@cards'] = ''
 
-        variables: dict[str, str | None] = {v: None for v in self['variables']}
-
-        keywords = [self.Keywords(**kwargs) for kwargs in keywords]
+        variables: dict[str, tuple[str, bool]] = {v: ('', False) for v in self['variables']}
+        keywords = [Keywords(**kwargs) for kwargs in keywords]
         for c, card in enumerate(self['cards'], start=1):
             if not is_print and len(self['test']) > 0 and c not in self['test']:
                 continue
 
             for v in self['variables']:
                 if v in card:
-                    variables[v] = card[v]['$']
-                    # manage keywords here, default=False though
+                    card_value = lambda: card[v]['$'].replace('\t', ' ').strip('\n ')
+                    variables[v] = (card_value(), card[v]['@keywords']) if '@keywords' in card[v] else (card_value(), False)
 
-
-            tex['@cards'] += '\n'.join([r'\toggle' + ('false' if t is None else 'true') + '{' + v + '}' for v, t in variables.items()])
+            tex['@cards'] += '\n'.join([r'\toggle' + ('true' if s else 'false') + '{' + v + '}' for v, s in variables.items()])
 
             for i in range(card['@copies'] if not is_draft else 1):
                 for prop in ('front', 'back'):
@@ -192,17 +156,12 @@ class Tex:
                     if not text:
                         continue
 
-                    for var in self['variables']:
-                        text = text.replace(fr'\if<${var}$>', r'\ifvar{' + var + '}')
-                        if variables[var] is None:
-                            value = ''
-                        else:
-                            value = variables[var].replace('\t', ' ').strip('\n\t ')
+                    for v in self['variables']:
+                        value = variables[v][0]
+                        if variables[v][1]:
                             for kw in keywords:
                                 value = kw.apply(value)
-                            # apply keywords to value here
-
-                        text = text.replace(f'<${var}$>', value)
+                        text = text.replace(fr'\if<${v}$>', r'\ifvar{' + v + '}').replace(f'<${v}$>', value)
 
                     tex['@cards'] += '\n'.join([
                         f'\n\n% CARD {c}, COPY {i + 1}, {prop.upper()}',
@@ -231,8 +190,8 @@ class Tex:
             working_tex = wf.read()
             working_tex_ln = ('\n' + working_tex).split('\n')
 
-        ln_ww = max([len(str(len(x))) for x in [working_tex_ln, cache_tex_ln]])
-        ln_w = lambda _: str(_).ljust(ln_ww, ' ')
+        _ = max([len(str(len(x))) for x in [working_tex_ln, cache_tex_ln]])
+        ln_w = lambda _: str(_).ljust(_, ' ')
 
         working_tex_content_start = {}
         for m in re.finditer(r'^[^%\n]*\\cardlatex\[(front|back)]\{', working_tex, re.MULTILINE):
@@ -271,7 +230,7 @@ class Tex:
                         if d is None:
                             # immediately exit process, missing image errors take long to process
                             process.kill(15)
-                            raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n>\t' + '\n>\t'.join(files))
+                            raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n-\t' + '\n-\t'.join(files))
 
                         if (file := working_dir / d / fn).exists():
                             if is_draft:
@@ -286,21 +245,22 @@ class Tex:
                     error = process.match.group(2).decode().strip('\n ').replace('\r', '')
                     ln_row, loc, frontback = cache_tex_content_start[[ln >= r for r, _, _ in cache_tex_content_start].index(False) - 1]
                     if frontback is None:
-                        logging.error('\n\t'.join([f'Error in preamble',
-                                           f'\n\tln. {ln} of compiled',
-                                           *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
-                                           '\n\tTeX error message was',
-                                           *[ln_w('') + ' >> ' + t for t in error.split('\n')]]) + '\n')
+                        error_text = [f'Error in preamble',
+                                      f'\n\tln. {ln} of compiled',
+                                      *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
+                                      '\n\tTeX error message was',
+                                      *[ln_w('') + ' >> ' + t for t in error.split('\n')]]
                     else:
                         ln_cardtex = working_tex_content_start[frontback] + ln - ln_row
-                        logging.error('\n\t'.join([f'Error in {loc} [{frontback}]',
-                                           f'\n\tln. {ln_cardtex} of template',
-                                           *[ln_w(l) + ' >> ' + working_tex_ln[l] for l in
-                                             range(ln_cardtex - 2, ln_cardtex + 3)],
-                                           f'\n\tln. {ln} of compiled',
-                                           *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
-                                           f'\n\tTeX error message was',
-                                           *[ln_w('') + ' >> ' + t for t in error.split('\n')]]) + '\n')
+                        error_text = [f'Error in {loc} [{frontback}]',
+                                      f'\n\tln. {ln_cardtex} of template',
+                                      *[ln_w(l) + ' >> ' + working_tex_ln[l] for l in
+                                        range(ln_cardtex - 2, ln_cardtex + 3)],
+                                      f'\n\tln. {ln} of compiled',
+                                      *[ln_w(l) + ' >> ' + cache_tex_ln[l] for l in range(ln - 2, ln + 3)],
+                                      f'\n\tTeX error message was',
+                                      *[ln_w('') + ' >> ' + t for t in error.split('\n')]]
+                    logging.error('\n\t'.join(error_text) + '\n')
                     errors += 1
                 elif p == 3:  # EOF
                     with open(log_path := self._cache_file.with_suffix('.log')) as f:
@@ -318,7 +278,7 @@ class Tex:
                         for path, name in zip([log_path, self._cache_file], names):
                             shutil.copy(path, self._working_file.with_suffix(name))
                         logging.info(self._working_file.name + f' failed! ({errors} error{"s" if errors > 1 else ""})')
-                    return 0 if errors == 0 else 1
+                    return
 
                 process.sendline('')
         except pexpect.TIMEOUT as e:
@@ -336,3 +296,45 @@ class Tex:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 tar.save(filename=target.as_posix())
         os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
+
+
+class Keywords:
+    def __init__(self, **kwargs):
+        self._m: bool = kwargs['@multiline']
+        self._keywords = {kw['@key']: kw['@value'] for kw in kwargs['keyword']}
+
+    def __str__(self):
+        m = ' (multiline)' if self._m else ''
+        return f'Keywords {m}: [' + ', '.join(self._keywords.keys()) + ']'
+
+    def _apply(self, string: str):
+        replace: dict[tuple[int, int], str] = {}
+        reserved: set[int] = set()
+        for key, word in self._keywords.items():
+            for m in re.finditer(key, string):
+                if string == '':
+                    return word
+
+                w = word
+                while mm := re.search(r'#(\d)', w):
+                    l, r = mm.span()
+                    w = w[:l] + m.group(int(mm.group(1))) + w[r:]
+
+                reservation = set(range(*m.span()))
+                if not reserved.intersection(reservation):
+                    replace[(min(reservation), max(reservation))] = w
+                    reserved.update(reservation)
+
+        # guaranteed no overlap in replace keys now
+        c, result = 0, ''
+        for l, r in sorted(replace, key=lambda a: a[0]):
+            result += string[c:l] + replace[(l, r)]
+            c = r + 1
+
+        return result + string[c:]
+
+    def apply(self, string: str):
+        string_list = [string] if self._m else string.split('\n')
+        for s in range(len(string_list)):
+            string_list[s] = self._apply(string_list[s])
+        return '\n'.join(string_list)
