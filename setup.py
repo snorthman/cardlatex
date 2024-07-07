@@ -23,10 +23,12 @@ if __name__ == '__main__':
             'jinja2~=3.1'
         ],
         extras_require={
-            'dev': [
+            'test': [
                 'pytest',
+                'pytest-asyncio',
                 'coverage',
-                'flake8'
+                'flake8',
+                'freezegun'
             ]
         },
         entry_points={

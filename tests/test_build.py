@@ -4,8 +4,10 @@ import traceback
 from itertools import combinations, chain
 from pathlib import Path
 from typing import Callable
+from datetime import datetime
 
 import pytest
+import freezegun
 from click import BaseCommand
 from click.testing import CliRunner
 from pikepdf import Pdf
@@ -16,9 +18,15 @@ from cardlatex.tex import Tex
 args_build_params = [['all'], ['combine'], ['print'], ['draft']]
 
 
-@pytest.mark.parametrize('xml', ['test.xml'])
-def test_build_(test_dir: Path, click: Callable, xml: str):
+@freezegun.freeze_time("2024-01-01")
+@pytest.mark.parametrize('xml', ['test_print.xml'])
+# @pytest.mark.parametrize('xml', ['test_draft.xml', 'test_print.xml', 'test_draft_print.xml'])
+def test_cardlatex(test_dir: Path, click: Callable, xml: str):
     click((test_dir / xml).as_posix())
+    expected_dir = Path('tests/output_expected') / test_dir.name
+    with open(expected_dir / (xml + '.log')) as fe, open(test_dir / (xml + '.log')) as ft:
+        assert fe.read() == ft.read()
+
 
 
 @pytest.fixture(params=chain(*[combinations(args_build_params, n) for n in range(len(args_build_params) + 1)]))

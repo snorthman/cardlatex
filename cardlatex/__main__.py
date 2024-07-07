@@ -45,7 +45,7 @@ def cardlatex(xml: str, test: str, debug: bool):
     try:
         x = XML(c, debug)
         x.validate()
-        x.build(test=test)  # TODO: ensure test is in xml
+        x.build(test=test)
     except Exception as e:
         logging.error(str(e))
         logging_result = ' with errors'

@@ -1,4 +1,5 @@
 import math
+import logging
 from decimal import Decimal
 from pathlib import Path
 from typing import List
@@ -93,5 +94,6 @@ def grid_pdf(file: Path, has_back: bool = False):
                 x = x_offset
                 y += rect_height
 
+    logging.info(f'{file.name} as print completed! ({len(pdf.pages)} pages)')
     pdf.close()
     pdf_output.save(file)

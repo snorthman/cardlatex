@@ -32,10 +32,8 @@
       </xs:sequence>
       <!--   use low resolution images, respect 'test' attributes and ignore 'copies' attributes   -->
       <xs:attribute name="draft" type="xs:boolean" use="required"/>
-      <!--   ignore 'test' attributes   -->
-      <xs:attribute name="print" type="xs:boolean" default="false"/>
       <!--   grid all cards onto <paper size>   -->
-      <xs:attribute name="paper">
+      <xs:attribute name="print">
         <xs:simpleType>
           <xs:restriction base="xs:string">
             <xs:enumeration value="auto"/>

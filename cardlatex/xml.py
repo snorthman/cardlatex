@@ -37,8 +37,7 @@ class XML:
             try:
                 schema.validate(xml)
             except xmlschema.validators.exceptions.XMLSchemaValidationError as e:
-                raise Exception(
-                    'XML validation failed: \n' + re.search(r'Instance:\n\n(.+)\nPath:', e.msg, re.DOTALL).group(1) + '\nReason: ' + e.reason)
+                raise Exception('XML validation failed: \n' + re.search(r'Instance:\n\n(.+)\nPath:', e.msg, re.DOTALL).group(1) + '\nReason: ' + e.reason)
 
             xml_dict: dict = schema.to_dict(xml)
             tex_list.clear()
@@ -56,25 +55,26 @@ class XML:
 
         self._tex = tex_list
         self._draft = xml_dict['@draft']
-        self._print = xml_dict['@print']
-        self._paper = xml_dict.get('@paper', None)
+        self._paper = xml_dict.get('@print', None)
         self._kwargs = xml_dict.get('keywords', [])
 
         logging.info(self._cache.file_xml.name + ' is valid.')
 
-    def build(self, test: str = None):
+    async def build(self, test: str = None):
         for tex in self._tex:
-            tex.write(self._kwargs, is_draft=self._draft, is_print=self._print)
+            tex.write(self._kwargs, self._draft)
 
         if test is not None:
             self._tex = [_ for _ in self._tex if _.name == test]
+            if len(self._tex) == 0:
+                raise ValueError(f'{test} not found in {self._cache.file_xml.name}')
 
         start = datetime.now()
         resampled = set()
         for tex in self._tex:
             tex_start = datetime.now()
             try:
-                tex.xelatex(is_draft=self._draft)
+                await tex.xelatex(self._draft)
                 resampled.update({_.relative_to(self._cache.cache_directory) for _ in tex.resampled})
             except pexpect.exceptions.TIMEOUT as e:
                 raise e
@@ -88,7 +88,7 @@ class XML:
 
         logging.info(f'All builds finished after {datetime.now() - start}')
         if len(resampled) > 0:
-            logging.debug('Resampled images:\n- ' + '\n- '.join(_.as_posix() for _ in resampled))
+            logging.debug('Resampled images:\n- ' + '\n- '.join(sorted(_.as_posix() for _ in resampled)))
 
         if self._paper:
             for tex in self._tex:

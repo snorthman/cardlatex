@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<cardlatex draft="true">
+<cardlatex draft="true" print="auto">
 	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in" test="1">
 		<!--	Poker size	-->
 		<card copies="2">
@@ -18,8 +18,21 @@
 			<art>background_combine</art>
 		</card>
 	</tex>
-	<keywords>
-		<keyword key="^$" value="\blockmargin{}"/>
-		<keyword key="^.+$" value="\block{#0}"/>
-	</keywords>
+	<tex file="front_back.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
+		<card>
+			<art>background</art>
+			<title>hello</title>
+			<text>
+				no
+
+					or
+
+				maybe
+			</text>
+		</card>
+		<card>
+			<text/>
+			<art>background_combine</art>
+		</card>
+	</tex>
 </cardlatex>

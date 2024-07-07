@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<cardlatex draft="false" print="auto">
+	<tex file="front.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
+		<!--	Poker size	-->
+		<card copies="2">
+			<art>background</art>
+			<title>hello</title>
+			<text>
+				no
+
+					or
+
+				maybe
+			</text>
+		</card>
+		<card>
+			<text/>
+			<art>background_combine</art>
+		</card>
+	</tex>
+	<tex file="front_back.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
+		<card>
+			<art>background</art>
+			<title>hello</title>
+			<text>
+				no
+
+					or
+
+				maybe
+			</text>
+		</card>
+		<card>
+			<text/>
+			<art>background_combine</art>
+		</card>
+	</tex>
+</cardlatex>

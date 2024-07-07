@@ -81,13 +81,15 @@ class Tex:
         if props['front'] is None:
             raise ValueError(prop_name('front') + ' missing')
 
-        test = []
-        for t in attributes.get('@test', '').split(','):
-            if m := re.search(r'(\d+)(?:-(\d+)|\.{2,}(\d+))', t):
-                l, r = m.group(1), m.group(2) if m.group(2) else m.group(3)
-            else:
-                l, r = t, t
-            test.extend(range(int(l), int(r) + 1))
+        test = attributes.get('@test', '')
+        test_pages = []
+        if test:
+            for t in attributes.get('@test', '').split(','):
+                if m := re.search(r'(\d+)(?:-(\d+)|\.{2,}(\d+))', t):
+                    l, r = m.group(1), m.group(2) if m.group(2) else m.group(3)
+                else:
+                    l, r = t, t
+                test_pages.extend(range(int(l), int(r) + 1))
 
         def as_length(value: str):
             value = str(value).strip()
@@ -102,7 +104,7 @@ class Tex:
             'spacing': as_length(attributes['@spacing']),
             'dpi': attributes['@dpi'],
             'cards': attributes.get('card', []),
-            'test': test,
+            'test': test_pages,
             'props': props,
             'variables': {m.group(1) for m in re.finditer(r'<\$(\w+)\$>', props['front'] + (props['back'] if props['back'] else ''))}
         }
@@ -110,7 +112,7 @@ class Tex:
     def __getitem__(self, item):
         return self._attr[item]
 
-    def write(self, keywords: list, is_draft: bool, is_print: bool):
+    def write(self, keywords: list, is_draft: bool):
         tex = {}
 
         t, rr = '', 0
@@ -151,16 +153,18 @@ class Tex:
         tex['document'] = '\\begin{document}\n\n'
         tex['@cards'] = ''
 
-        variables: dict[str, tuple[str, bool]] = {v: ('', False) for v in self['variables']}
+        variables: dict[str, list[str | bool]] = {v: ['', False] for v in self['variables']}
         keywords = [Keywords(**kwargs) for kwargs in keywords]
         for c, card in enumerate(self['cards'], start=1):
-            if not is_print and len(self['test']) > 0 and c not in self['test']:
+            if is_draft and len(self['test']) > 0 and c not in self['test']:
                 continue
 
             for v in self['variables']:
                 if v in card:
-                    card_value = lambda: card[v]['$'].replace('\t', ' ').strip('\n ')
-                    variables[v] = (card_value(), card[v]['@keywords']) if '@keywords' in card[v] else (card_value(), False)
+                    if '$' in card[v]:
+                        variables[v][0] = card[v]['$'].replace('\t', ' ').strip('\n ')
+                    if '@keywords' in card[v]:
+                        variables[v][1] = card[v]['@keywords']
 
             tex['@cards'] += '\n'.join([r'\toggle' + ('true' if s else 'false') + '{' + v + '}' for v, s in variables.items()])
 
@@ -210,14 +214,15 @@ class Tex:
                 'ln': len(cache_tex[:m.end()].split('\n'))
             })
 
-        if (pdf_path := self._cache_file.with_suffix('.pdf')).exists():
-            os.remove(pdf_path)
-        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{self._cache_file.stem}".tex 2&>1'
+        file = self._cache_file if is_draft else self._working_file
+        cwd = cache_dir if is_draft else working_dir
+        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{file.stem}".tex 2&>1'
+        assert (cwd / file.name).exists(), FileNotFoundError(f'{cwd / file.name} does not exist')
 
         if os.name == 'nt':
-            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cache_dir.as_posix())
+            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cwd.as_posix())
         else:
-            process = pexpect.spawn(cmd, cwd=cache_dir.as_posix(), echo=False)
+            process = pexpect.spawn(cmd, cwd=cwd.as_posix(), echo=False)
 
         try:
             directories = None
@@ -227,7 +232,6 @@ class Tex:
                        pexpect.EOF]
             while True:
                 p = process.expect(expects)
-
                 if p == 0:
                     directories = sorted(['.'] + [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group().decode())])
                 elif p == 1:
@@ -265,10 +269,10 @@ class Tex:
                             if c == len(cache_cards) - 1 or cache_error_ln < cache_cards[c + 1]['ln']:
                                 break
 
-                    loc = 'preamble'
+                    loc = 'Preamble'
                     if cache_card > -1:
                         card, side, _ = tuple(cache_cards[cache_card].values())
-                        loc = f'card {card}[{side.lower()}]'
+                        loc = f'Card {card}, {side}'
                     msg = '\n'.join([f'Error in {self.name}: {loc}',
                                      *cache_error_lns,
                                      'Error message was',
