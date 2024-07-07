@@ -53,7 +53,7 @@
 }
 
 \newcounter{cardlatex}\stepcounter{cardlatex}
-\newenvironment{tikzcard}[3][0]{
+\newenvironment{tikzcard}[3]{% dpi, width, height%, spacing
 \tikzmath{
 	coordinate \card;
 	\card = (#2-\bleed,#3-\bleed);

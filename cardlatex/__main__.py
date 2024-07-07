@@ -1,4 +1,5 @@
 import logging
+import sys
 import shutil
 from datetime import datetime
 
@@ -25,10 +26,10 @@ def cardlatex(xml: str, test: str, debug: bool):
 
     start = datetime.now()
 
-    logging_file = (c.cache_directory / 'cardlatex.log').as_posix()
+    logging_file = (c.cache_directory / 'cardlatex.log').as_posix(), c.working_directory / (c.file_xml.name + '.log')
     logger = logging.getLogger()
     handlers = [
-        logging.FileHandler(filename=logging_file, mode='w'),
+        logging.FileHandler(filename=logging_file[0], mode='w'),
         logging.StreamHandler()
     ]
     for handler in handlers:
@@ -51,13 +52,16 @@ def cardlatex(xml: str, test: str, debug: bool):
         logging_result = ' with errors'
         if debug:
             raise e
+        else:
+            print(f'cardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}', file=sys.stderr)
+        logging.info(f'tempfiles are stored at\n{c.cache_directory.resolve()}')
     finally:
         logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
         for handler in logger.handlers:
             handler.close()
             logger.removeHandler(handler)
 
-        shutil.move(logging_file, c.working_directory / (c.file_xml.name + '.log'))
+        shutil.move(logging_file[0], logging_file[1])
 
 
 if __name__ == '__main__':

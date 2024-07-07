@@ -103,7 +103,7 @@ class Tex:
             'width': as_length(attributes['@width']),
             'height': as_length(attributes['@height']),
             'bleed': as_length(attributes['@bleed']),
-            'spacing': as_length(attributes['@spacing']),
+            # 'spacing': as_length(attributes['@spacing']),
             'dpi': attributes['@dpi'],
             'cards': attributes.get('card', []),
             'test': test_pages,
@@ -185,7 +185,7 @@ class Tex:
 
                     tex['@cards'] += '\n'.join([
                         f'\n\n% CARD {c}, COPY {i + 1}, {prop.upper()}',
-                        r'\begin{tikzcard}[' + self['dpi'] + ']{' + self['width'] + '}{' + self['height'] + '}',
+                        r'\begin{tikzcard}' + ''.join('{' + self[_] + '}' for _ in ('dpi', 'width', 'height')),
                         text,
                         '\\end{tikzcard}%'
                     ])
@@ -292,7 +292,6 @@ class Tex:
                 subprocess.run(['taskkill', '/PID', str(process.pid), '/F'])
             else:
                 os.kill(process.pid, signal.SIGTERM)
-            process.kill(15)
             raise e
 
     @staticmethod

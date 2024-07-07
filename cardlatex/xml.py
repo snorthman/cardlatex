@@ -64,10 +64,18 @@ class XML:
         for tex in self._tex:
             tex.write(self._kwargs, self._draft)
 
+        output_file = self._cache.working_directory / self._cache.file_xml.with_suffix('.pdf').name
         if test is not None:
             self._tex = [_ for _ in self._tex if _.name == test]
             if len(self._tex) == 0:
                 raise ValueError(f'{test} not found in {self._cache.file_xml.name}')
+            output_file = self._tex[-1].name.with_suffix('.pdf').name
+
+        try:
+            with open(output_file, 'ab') as f:
+                f.write(b'')
+        except PermissionError as e:
+            raise e
 
         start = datetime.now()
         resampled = set()
@@ -92,9 +100,14 @@ class XML:
 
         if self._paper:
             for tex in self._tex:
-                grid_pdf(self._cache.cache_directory / tex.output_name, tex.has_back)
+                try:
+                    grid_pdf(self._paper, self._cache.cache_directory / tex.output_name, tex.has_back)
+                except Exception as e:
+                    logging.error(f'{tex.name}: {e}')
 
         combined_pdf = combine_pdf([self._cache.cache_directory / _.output_name for _ in self._tex])
+        for tex in self._tex:
+            os.remove(self._cache.cache_directory / tex.output_name)
 
         if test is not None:
             shutil.copy(combined_pdf, self._cache.working_directory / self._tex[-1].name.with_suffix('.pdf').name)
