@@ -60,7 +60,7 @@ class XML:
 
         logging.info(self._cache.file_xml.name + ' is valid.')
 
-    async def build(self, test: str = None):
+    def build(self, test: str = None):
         for tex in self._tex:
             tex.write(self._kwargs, self._draft)
 
@@ -74,7 +74,7 @@ class XML:
         for tex in self._tex:
             tex_start = datetime.now()
             try:
-                await tex.xelatex(self._draft)
+                tex.xelatex(self._draft)
                 resampled.update({_.relative_to(self._cache.cache_directory) for _ in tex.resampled})
             except pexpect.exceptions.TIMEOUT as e:
                 raise e

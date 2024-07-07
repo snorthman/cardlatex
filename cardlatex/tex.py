@@ -1,6 +1,8 @@
 import logging
 import os
 import re
+import subprocess
+import signal
 from pathlib import Path
 
 import pexpect
@@ -214,15 +216,12 @@ class Tex:
                 'ln': len(cache_tex[:m.end()].split('\n'))
             })
 
-        file = self._cache_file if is_draft else self._working_file
-        cwd = cache_dir if is_draft else working_dir
-        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{file.stem}".tex 2&>1'
-        assert (cwd / file.name).exists(), FileNotFoundError(f'{cwd / file.name} does not exist')
+        cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{self._cache_file.stem}".tex'
 
-        if os.name == 'nt':
-            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cwd.as_posix())
+        if os.name == 'nt':  # Windows
+            process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cache_dir.as_posix())
         else:
-            process = pexpect.spawn(cmd, cwd=cwd.as_posix(), echo=False)
+            process = pexpect.spawn(cmd, cwd=cache_dir.as_posix(), echo=False)
 
         try:
             directories = None
@@ -232,6 +231,7 @@ class Tex:
                        pexpect.EOF]
             while True:
                 p = process.expect(expects)
+                p_send = ''
                 if p == 0:
                     directories = sorted(['.'] + [m.group(1) for m in re.finditer(r'\{(.+?)}', process.match.group().decode())])
                 elif p == 1:
@@ -241,7 +241,6 @@ class Tex:
                     for d in directories + [None]:
                         if d is None:
                             # immediately exit process, missing image errors take long to process
-                            process.kill(15)
                             raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n-\t' + '\n-\t'.join(files))
 
                         if (file := working_dir / d / fn).exists():
@@ -251,6 +250,8 @@ class Tex:
                                 elif file.lstat().st_mtime_ns != file_resampled.lstat().st_mtime_ns:
                                     self._resample(file, file_resampled)
                                 self._resampled.add(file_resampled)
+                            else:
+                                p_send = working_dir.as_posix() + '/'
                             break
                         files.append(file.as_posix())
                 elif p == 2:
@@ -277,7 +278,6 @@ class Tex:
                                      *cache_error_lns,
                                      'Error message was',
                                      *[f'  >> {_}' for _ in xelatex_error.split('\n')]])
-                    process.kill(15)
                     raise RuntimeError(msg)
                 elif p == 3:  # EOF
                     with open(self._cache_file.with_suffix('.log')) as f:
@@ -286,8 +286,13 @@ class Tex:
                     logging.info(self._working_file.name + f' completed! ({m.group(2)} pages)')
                     return
 
-                process.sendline('')
+                process.sendline(p_send)
         except Exception as e:
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/PID', str(process.pid), '/F'])
+            else:
+                os.kill(process.pid, signal.SIGTERM)
+            process.kill(15)
             raise e
 
     @staticmethod

@@ -21,7 +21,7 @@
 	<tex file="front_back.tex" dpi="2048/3.5" width="2.5in" height="3.5in" bleed="0.125in">
 		<card>
 			<art>background</art>
-			<title>hello</title>
+			<title>hello2</title>
 			<text>
 				no
 
