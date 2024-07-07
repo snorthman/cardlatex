@@ -7,7 +7,7 @@ if __name__ == '__main__':
         name='cardlatex',
         version=version,
         packages=['cardlatex'],
-        package_data={"cardlatex": ["*.tex"]},
+        package_data={'cardlatex': ['*.tex', '*.xsd']},
         url=r'https://github.com/snorthman/cardlatex',
         license='MIT License',
         author='C.R. Noordman',

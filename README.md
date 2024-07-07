@@ -2,8 +2,6 @@
 
 **cardlatex** is a XeLaTeX wrapper which compiles TeX from specific templated `.tex` and `.xlsx` files. Both `.tex` and `.xlsx` must share the same file name.
 
-**Please note this is a pre-release.**
-
 ![PyPI - Version](https://img.shields.io/pypi/v/cardlatex)
 
 ---
@@ -61,7 +59,7 @@ pip install cardlatex --upgrade
 ```
 project/
 ├── card.tex
-├── card.xlsx
+├── project.xml
 └── art/
     └── background.png
 ```
@@ -69,10 +67,6 @@ project/
 `card.tex`
 
 ```latex
-\cardlatex[width]{2cm}
-\cardlatex[height]{3cm}
-\cardlatex[bleed]{0.125in}
-\cardlatex[include]{1...2,4}
 \cardlatex[front]{
     \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
     \if<$title$>{
@@ -81,39 +75,60 @@ project/
 }
 ```
 
-Our card is 2 cm by 3 cm with a 0.125in bleed. We are only interested in compiling rows 1, 2 and 4.
+`project.xml`
 
-`card.xlsx`
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<cardlatex draft="true">
+	<tex file="card.tex" dpi="300" width="2cm" height="3cm" bleed="0.125in" test="1">
+		<card copies="2">
+			<art>background</art>
+			<title>hello</title>
+			<text>
+                some **TEXTS**
+                to __display__
+			</text>
+		</card>
+		<card>
+			<text/>
+			<art>background_combine</art>
+		</card>
+	</tex>
+    <keywords>
+        <keyword key="**(.+?)**" value="\textbf{#1}"/>
+        <keyword key="__(.+?)__" value="\textit{#1}"/>
+    </keywords>
+    <keywords>
+        <keyword key="TEXTS?" value="CardLaTeX"/>
+    </keywords>
+</cardlatex>
+```
 
-| art        | title     |   
-|------------|-----------|
-| background | Yesterday | 
-| background | Today     |  
-| background | Tomorrow  | 
-| background | Future    |
+Our card is 2 cm by 3 cm with a 0.125in bleed. We are only interested in compiling card 1. 
+Compiling more cards takes longer, slowing ourselves down.
 
 In directory in which these files exist, we run:
 
 ```commandline
-cardlatex card.tex --draft
+cardlatex project.xml
 ```
-
-This will output three new files:
 
 ```
 project/
 ├── card.tex
-├── card.xlsx
-├── card.cardlatex.tex (the .tex file that is actually compiled with xelatex.exe)
-├── card.pdf (the resulting .pdf file)
-└── card.log (the .log file, in case any errors occur)
+├── project.xml
+├── project.xml.log
+├── project.pdf
+└── art/
+    └── background.png
 ```
 
 ## Documentation
 
-## `.tex` configurations
+## `.xml` configuration
 
-Configurations are defined in the `.tex` document. Defining the same variable more than once is an error.
+WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  WORKING IN PROGRESS  
+Configurations are defined in the `.xml` document. Defining the same variable more than once is an error.
 
 **Do not use TeX macros or placeholder variables in any configuration other than `front` and `back`.**
 

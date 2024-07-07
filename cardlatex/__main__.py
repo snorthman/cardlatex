@@ -19,7 +19,8 @@ class CustomFormatter(logging.Formatter):
 
 @click.command()
 @click.argument('xml', nargs=1, type=click.Path(exists=True))
-@click.option('--test', type=click.Path(exists=True), required=False)
+@click.option('--test', type=click.Path(exists=True), required=False,
+              help='Specify a .tex file within the given XML to compile individually. This option allows you to target and compile a single .tex file from the XML for testing purposes.')
 @click.option('--debug', is_flag=True, hidden=True, default=False)
 def cardlatex(xml: str, test: str, debug: bool):
     c = Cache(xml)
