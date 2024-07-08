@@ -14,20 +14,22 @@ class Keywords:
         replace: dict[tuple[int, int], str] = {}
         reserved: set[int] = set()
         for key, word in self._keywords.items():
-            for m in re.finditer(key, string):
-                if string == '':
-                    return word
+            try:
+                for m in re.finditer(key, string):
+                    if string == '':
+                        return word
 
-                w = word
-                while mm := re.search(r'#(\d)', w):
-                    l, r = mm.span()
-                    w = w[:l] + m.group(int(mm.group(1))) + w[r:]
+                    w = word
+                    while mm := re.search(r'#(\d)', w):
+                        l, r = mm.span()
+                        w = w[:l] + m.group(int(mm.group(1))) + w[r:]
 
-                reservation = set(range(*m.span()))
-                if not reserved.intersection(reservation):
-                    replace[(min(reservation), max(reservation))] = w
-                    reserved.update(reservation)
-
+                    reservation = set(range(*m.span()))
+                    if not reserved.intersection(reservation):
+                        replace[(min(reservation), max(reservation))] = w
+                        reserved.update(reservation)
+            except re.error as e:
+                raise ValueError(f'Regex error:     "{e.msg}"\nInvalid keyword: "{key}"')
         # guaranteed no overlap in replace keys now
         c, result = 0, ''
         for l, r in sorted(replace, key=lambda a: a[0]):

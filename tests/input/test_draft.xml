@@ -5,10 +5,10 @@
 		<card copies="2">
 			<art>background</art>
 			<title>hello</title>
-			<text>
+			<text keywords="true">
 				no
 
-					or
+					**or**
 
 				maybe
 			</text>
@@ -35,4 +35,10 @@
 			<art>background_combine</art>
 		</card>
 	</tex>
+	<keywords>
+		<keyword key=".+" value="#0\newline"/>
+	</keywords>
+	<keywords>
+		<keyword key="\*\*(.+?)\*\*" value="\textbf{#1}"/>
+	</keywords>
 </cardlatex>

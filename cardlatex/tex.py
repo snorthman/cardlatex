@@ -193,6 +193,9 @@ class Tex:
             tex['@cards'] += '\n\\stepcounter{cardlatex}\n\n'
         tex['@cards'] = '\n\t' + tex['@cards'].replace('\n', '\n\t')
 
+        if is_draft:
+            logging.debug(f'{self.name}:\n' + tex['@cards'])
+
         tex['@documentend'] = '\n\\end{document}'
 
         with open(self._cache_file, 'w') as f:

@@ -58,6 +58,7 @@ def cardlatex(xml: str, test: str, debug: bool):
         logging.info(f'tempfiles are stored at\n{c.cache_directory.resolve()}')
     finally:
         logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
+        logging.info(f'tempfiles are stored at\n{c.cache_directory.resolve()}')
         for handler in logger.handlers:
             handler.close()
             logger.removeHandler(handler)
