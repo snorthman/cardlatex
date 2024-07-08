@@ -5,16 +5,19 @@ from typing import Callable
 import freezegun
 import pytest
 
-args_build_params = [['all'], ['combine'], ['print'], ['draft']]
-
 
 @freezegun.freeze_time("2024-01-01")
-@pytest.mark.parametrize('xml', ['test_draft.xml'])
-# @pytest.mark.parametrize('xml', ['test_draft.xml', 'test_print.xml', 'test_draft_print.xml'])
-def test_cardlatex(test_dir: Path, click: Callable, xml: str):
+@pytest.mark.parametrize('xml', ['test_draft.xml', 'test_print.xml', 'test_draft_print.xml'])
+def test_cardlatex(click: Callable, test_dir: Path, xml: str):
     click((test_dir / xml).as_posix())
     [os.remove(_) for _ in test_dir.iterdir() if _.suffix == '.xml' and _ != xml]
     expected_dir = Path('tests/output_expected') / test_dir.name
     with open(expected_dir / (xml + '.log')) as fe, open(test_dir / (xml + '.log')) as ft:
         log = fe.read(), ft.read()
         assert log[0][:log[0].index('cardlatex ended in 0:00:00')] == log[1][:log[1].index('cardlatex ended in 0:00:00')]
+
+
+def test_cardlatex_target(click: Callable):
+    target = Path(os.getenv('TESTCARDLATEX'))
+    assert target.exists() and target.suffix == '.xml'
+    click(target.as_posix())

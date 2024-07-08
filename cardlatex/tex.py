@@ -4,6 +4,7 @@ import re
 import subprocess
 import signal
 from pathlib import Path
+from datetime import datetime
 
 import pexpect
 import pexpect.popen_spawn
@@ -205,6 +206,8 @@ class Tex:
                 f.write(value)
 
     def xelatex(self, is_draft: bool):
+        start = datetime.now()
+
         working_dir = self._working_file.parent
         cache_dir = self._cache_file.parent
         with open(self._cache_file) as cf:
@@ -286,13 +289,13 @@ class Tex:
                     with open(self._cache_file.with_suffix('.log')) as f:
                         log = f.read()
                     m = re.search(r'Output written on (.+)pdf \((\d+)', log)
-                    logging.info(self._working_file.name + f' completed! ({m.group(2)} pages)')
+                    logging.info(self._working_file.name + f' completed after {datetime.now() - start}! ({m.group(2)} pages)')
                     return
 
                 process.sendline(p_send)
         except Exception as e:
             if os.name == 'nt':
-                subprocess.run(['taskkill', '/PID', str(process.pid), '/F'])
+                subprocess.run(['taskkill', '/PID', str(process.pid), '/F'], stdout=subprocess.PIPE)
             else:
                 os.kill(process.pid, signal.SIGTERM)
             raise e

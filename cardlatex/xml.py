@@ -80,7 +80,6 @@ class XML:
         start = datetime.now()
         resampled = set()
         for tex in self._tex:
-            tex_start = datetime.now()
             try:
                 tex.xelatex(self._draft)
                 resampled.update({_.relative_to(self._cache.cache_directory) for _ in tex.resampled})
@@ -88,11 +87,9 @@ class XML:
                 raise e
             except Exception as e:
                 logging.error(str(e))
-                logging.info(f'{tex.name} failed after {datetime.now() - tex_start}')
+                logging.info(f'{tex.name} failed')
                 if self._debug:
                     raise e
-            else:
-                logging.info(f'{tex.name} completed after {datetime.now() - tex_start}')
 
         logging.info(f'All builds finished after {datetime.now() - start}')
         if len(resampled) > 0:

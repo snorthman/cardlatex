@@ -10,11 +10,16 @@ from .cache import Cache
 from .xml import XML
 
 
-class CustomFormatter(logging.Formatter):
+class FileFormatter(logging.Formatter):
     prefix = '                          | '
 
     def format(self, record):
         return f'{self.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S")} {record.levelname:<5} | ' + f'\n{self.prefix}'.join(record.msg.split('\n'))
+
+
+class StreamFormatter(logging.Formatter):
+    def format(self, record):
+        return f'{record.levelname[0]} > ' + f'\n    '.join(record.msg.split('\n'))
 
 
 @click.command()
@@ -28,16 +33,18 @@ def cardlatex(xml: str, test: str, debug: bool):
     start = datetime.now()
 
     logging_file = (c.cache_directory / 'cardlatex.log').as_posix(), c.working_directory / (c.file_xml.name + '.log')
-    logger = logging.getLogger()
-    handlers = [
-        logging.FileHandler(filename=logging_file[0], mode='w'),
-        logging.StreamHandler()
-    ]
-    for handler in handlers:
-        handler.setFormatter(CustomFormatter())
-        logger.addHandler(handler)
 
-    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+    handler_file = logging.FileHandler(filename=logging_file[0], mode='w')
+    handler_file.setFormatter(FileFormatter())
+    handler_file.setLevel(logging.DEBUG)
+
+    handler_stream = logging.StreamHandler()
+    handler_stream.setFormatter(StreamFormatter())
+    handler_stream.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    [logger.addHandler(_) for _ in (handler_file, handler_stream)]
 
     logging_test = f' --test {test}' if test else ''
     logging_debug = f' --debug' if debug else ''
@@ -54,8 +61,7 @@ def cardlatex(xml: str, test: str, debug: bool):
         if debug:
             raise e
         else:
-            print(f'cardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}', file=sys.stderr)
-        logging.info(f'tempfiles are stored at\n{c.cache_directory.resolve()}')
+            print(f'\ncardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}\n', file=sys.stderr)
     finally:
         logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
         logging.info(f'tempfiles are stored at\n{c.cache_directory.resolve()}')
