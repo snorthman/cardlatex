@@ -117,7 +117,7 @@
   <xs:complexType name="carditem">
     <xs:simpleContent>
       <xs:extension base="xs:string">
-        <xs:attribute name="keywords" type="xs:boolean" default="false"/>
+        <xs:attribute name="keywords" type="xs:boolean"/>
       </xs:extension>
     </xs:simpleContent>
   </xs:complexType>

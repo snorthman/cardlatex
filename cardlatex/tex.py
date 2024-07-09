@@ -164,10 +164,14 @@ class Tex:
 
             for v in self['variables']:
                 if v in card:
-                    if '$' in card[v]:
-                        variables[v][0] = card[v]['$'].replace('\t', ' ').strip('\n ')
-                    if '@keywords' in card[v]:
-                        variables[v][1] = card[v]['@keywords']
+                    card_v = card[v]
+                    if isinstance(card_v, dict):
+                        if '$' in card_v:
+                            variables[v][0] = card_v['$'].replace('\t', ' ').strip('\n ')
+                        if '@keywords' in card_v:
+                            variables[v][1] = card_v['@keywords']
+                    elif isinstance(card_v, str):
+                        variables[v][0] = card_v.replace('\t', ' ').strip('\n ')
 
             tex['@cards'] += '\n'.join([r'\toggle' + ('true' if s else 'false') + '{' + v + '}' for v, s in variables.items()])
 
