@@ -1,11 +1,30 @@
-\cardlatex[front]{
-    \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
-    \if<$title$>{
-        \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
-    }{}
-    <$text$>
-    <$unused$>
-}
-\cardlatex[back]{
-	\node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>_back.png}};
+\cardlatex{
+    \front{
+        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
+        \if<$title$>{
+            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
+        }{}
+        <$text$>
+        <$unused$>
+    }
+
+    \back{
+        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>_back.png}};
+    }
+
+    \dpi{2048/3.5}
+    \width{2.5in}
+    \height{3.5in}
+    \bleed{0.125in}
+
+    \card[2]{
+        \art{background}
+        \title{hello}
+        \text{no \textbf{stars}}
+    }
+    \card{
+        \art{backgroundw2}
+        \title{hellow2}
+        \text{no2222222}
+    }
 }

@@ -17,7 +17,6 @@ def test_cardlatex(click: Callable, test_dir: Path, xml: str):
         assert log[0][:log[0].index('cardlatex ended in 0:00:00')] == log[1][:log[1].index('cardlatex ended in 0:00:00')]
 
 
-def test_cardlatex_target(click: Callable):
-    target = Path(os.getenv('TESTCARDLATEX'))
-    assert target.exists() and target.suffix == '.xml'
-    click(target.as_posix())
+@pytest.mark.parametrize('target', ['front_back'])
+def test_cardlatex_target(click: Callable, target: str):
+    click(Path(f'./tests/input/{target}.tex').as_posix())
