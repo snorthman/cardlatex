@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import shutil
 import subprocess
 import signal
 from pathlib import Path
@@ -25,13 +26,18 @@ def resample(source: Path, target: Path):
 def xelatex(file: Path, cache_dir: Path, is_draft: bool):
     start = datetime.now()
 
-    working_dir = file.parent.resolve()
     with open(file) as f:
         source = f.read()
         source_ln = ('\n' + source).split('\n')
+
     if is_draft:
-        with open(cache_dir / file.name, 'w') as f:
+        working_dir = cache_dir
+        working_file = working_dir / file.name
+        with open(working_file, 'w') as f:
             f.write(source)
+    else:
+        working_dir = file.parent
+        working_file = file
 
     cards = []
     for m in re.finditer(r'% CARD (\d+),( COPY \d+,)? (FRONT|BACK)\n', source):
@@ -41,19 +47,18 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool):
             'ln': len(source[:m.end()].split('\n'))
         })
 
-    cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{file.stem}".tex'
-    cwd = cache_dir.as_posix() if is_draft else working_dir.as_posix()
+    cmd = f'xelatex.exe -interaction=errorstopmode -file-line-error "{working_file.stem}".tex'
     if os.name == 'nt':  # Windows
-        process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=cwd)
+        process = pexpect.popen_spawn.PopenSpawn(cmd, cwd=working_dir.as_posix())
     else:
-        process = pexpect.spawn(cmd, cwd=cwd, echo=False)
+        process = pexpect.spawn(cmd, cwd=working_dir.as_posix(), echo=False)
 
     try:
         directories = None
         expects = [
             r'cardlatex@graphicpaths\r\n(.*?)\r',
             r'includegraphics@(.+?)\r',
-            file.name.replace('.', r'\.') + r':(\d+): (.*)l\.\1',
+            working_file.name.replace('.', r'\.') + r':(\d+): (.*)l\.\1',
             pexpect.EOF
         ]
         while True:
@@ -64,23 +69,23 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool):
             elif p == 1:
                 assert directories is not None
                 fn: str = process.match.group(1).decode()
-                files = []
+                img_files = []
                 for d in directories + [None]:
                     if d is None:
                         # immediately exit process, missing image errors take long to process
-                        raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n-\t' + '\n-\t'.join(files))
+                        raise FileNotFoundError(f'Could not find image "{fn}", searched in:\n-\t' + '\n-\t'.join(img_files))
 
-                    if (file := working_dir / d / fn).exists():
+                    if (img_file := working_dir / d / fn).exists():
                         if is_draft:
-                            if not (file_resampled := cache_dir / d / fn).exists():
-                                resample(file, file_resampled)
-                            elif file.lstat().st_mtime_ns != file_resampled.lstat().st_mtime_ns:
-                                resample(file, file_resampled)
+                            if not (img_file_resampled := cache_dir / d / fn).exists():
+                                resample(img_file, img_file_resampled)
+                            elif img_file.lstat().st_mtime_ns != img_file_resampled.lstat().st_mtime_ns:
+                                resample(img_file, img_file_resampled)
                             # resampled.add(file_resampled)
                         else:
                             p_send = working_dir.as_posix() + '/'
                         break
-                    files.append(file.as_posix())
+                    img_files.append(img_file.as_posix())
             elif p == 2:
                 xelatex_error = process.match.group(2).decode().replace('\r', '').strip('\n ')
                 error_ln = int(process.match.group(1)) - 1  # somehow, the line number is always off by +1
@@ -101,16 +106,16 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool):
                 if card > -1:
                     card, side, _ = tuple(cards[card].values())
                     loc = f'Card {card}, {side}'
-                msg = '\n'.join([f'Error in {file.name}: {loc}',
+                msg = '\n'.join([f'Error in {working_file.name}: {loc}',
                                  *error_lns,
                                  'Error message was',
                                  *[f'  >> {_}' for _ in xelatex_error.split('\n')]])
                 raise RuntimeError(msg)
             elif p == 3:  # EOF
-                with open(file.with_suffix('.log')) as f:
+                with open(working_file.with_suffix('.log')) as f:
                     log = f.read()
                 m = re.search(r'Output written on (.+)pdf \((\d+)', log)
-                logging.info(file.name + f' completed after {datetime.now() - start}! ({m.group(2)} pages)')
+                logging.info(working_file.name + f' completed after {datetime.now() - start}! ({m.group(2)} pages)')
                 return
 
             process.sendline(p_send)
@@ -122,5 +127,6 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool):
             os.kill(process.pid, signal.SIGTERM)
         raise e
     finally:
-        pass
+        shutil.move(working_file.with_suffix('.pdf'), file.parent / (working_file.name[:-14] + '.pdf'))
+        # C:\Users\s_nor\AppData\Local\Temp\cardlatex\0f3db7b900476536a9c64da1e6fd4ce053a230c2
 

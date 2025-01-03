@@ -96,20 +96,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TOGGLES
 
+\newtoggle{text}
+\newtoggle{unused}
 \newtoggle{title}
 \newtoggle{art}
-\newtoggle{unused}
-\newtoggle{text}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DOCUMENT
 
 \begin{document}
 
+	\toggletrue{text}
+	\togglefalse{unused}
 	\toggletrue{title}
 	\toggletrue{art}
-	\togglefalse{unused}
-	\toggletrue{text}
 	
 	% CARD 0, COPY 1, FRONT
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
@@ -133,15 +133,15 @@
 	\stepcounter{cardlatex}
 	
 	
+	\toggletrue{text}
+	\togglefalse{unused}
 	\toggletrue{title}
 	\toggletrue{art}
-	\togglefalse{unused}
-	\toggletrue{text}
 	
 	% CARD 1, FRONT
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
-	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/backgroundw2.png}};
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
 	        \ifvar{title}{
 	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hellow2}};
 	        }{}
@@ -153,7 +153,7 @@
 	% CARD 1, BACK
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
-	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/backgroundw2_back.png}};
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background_back.png}};
 	    
 	\end{tikzcard}
 	\stepcounter{cardlatex}
