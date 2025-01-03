@@ -1,6 +1,9 @@
 import logging
 import sys
+import tempfile
+import hashlib
 import shutil
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -27,12 +30,16 @@ class StreamFormatter(logging.Formatter):
 @click.argument('tex', nargs=1, type=click.Path(exists=True))
 @click.option('--debug', is_flag=True, hidden=True, default=False)
 def cardlatex(tex: Path, debug: bool):
-    from .tex2 import Tex
+    from .tex2 import write
+    from .xelatex import xelatex
 
     start = datetime.now()
-    t = Tex(Path(tex))
+    file = Path(tex)
 
-    logging_file = t.cardlatex_log_path.as_posix()
+    cache_dir = Path(tempfile.gettempdir()) / 'cardlatex' / hashlib.sha1(file.resolve().as_posix().encode('utf-8')).hexdigest()
+    cache_dir.mkdir(exist_ok=True, parents=True)
+
+    logging_file = file.with_suffix('.cardlatex.tex.log').as_posix()
 
     handler_file = logging.FileHandler(filename=logging_file, mode='w')
     handler_file.setFormatter(FileFormatter())
@@ -50,8 +57,8 @@ def cardlatex(tex: Path, debug: bool):
     logging_result = ''
 
     try:
-        t.parse()
-        pass
+        out_file, is_draft = write(file)
+        xelatex(out_file, cache_dir, is_draft)
     except Exception as e:
         logging.error(str(e))
         logging_result = ' with errors'
@@ -61,7 +68,7 @@ def cardlatex(tex: Path, debug: bool):
             print(f'\ncardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}\n', file=sys.stderr)
     finally:
         logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
-        logging.info(f'tempfiles are stored at\n{t.cache_dir.resolve()}')
+        logging.info(f'tempfiles are stored at\n{cache_dir.resolve()}')
         for handler in logger.handlers:
             handler.close()
             logger.removeHandler(handler)

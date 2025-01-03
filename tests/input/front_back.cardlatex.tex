@@ -34,7 +34,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % CARDLATEX
 
-\def\bleed{<$bleed$>}
+\def\bleed{0.125in}
 \def\setcoords{
 	\coordinate (TL) at (0,0);
 	\coordinate (TR) at (\cardx,0);
@@ -71,7 +71,7 @@
 	\setcoords
 	\begin{pgfonlayer}{print}
 		\draw[fill=black] ([xshift=-\bleed,yshift=\bleed]TL) rectangle ([xshift=\bleed,yshift=-\bleed]BR);
-		<$counter$>
+		\node[anchor=north west,white,xshift=-\bleed,yshift=\bleed] at (TL) {\texttt{\arabic{cardlatex}}};
 	\end{pgfonlayer}
 	\pgfsetxvec{\pgfpoint{1cm}{0cm}}
 	\pgfsetyvec{\pgfpoint{0cm}{1cm}}
@@ -92,3 +92,71 @@
 
 \typeout{cardlatex@graphicpaths}
 \makeatletter\typein{\Ginput@path}\makeatother
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TOGGLES
+
+\newtoggle{title}
+\newtoggle{art}
+\newtoggle{unused}
+\newtoggle{text}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT
+
+\begin{document}
+
+	\toggletrue{title}
+	\toggletrue{art}
+	\togglefalse{unused}
+	\toggletrue{text}
+	
+	% CARD 0, COPY 1, FRONT
+	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
+	
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
+	        \ifvar{title}{
+	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hel
+	        lo}};
+	        }{}
+	        no \textbf{stars}
+	        
+	    
+	\end{tikzcard}
+	
+	% CARD 0, COPY 1, BACK
+	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
+	
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background_back.png}};
+	    
+	\end{tikzcard}
+	\stepcounter{cardlatex}
+	
+	
+	\toggletrue{title}
+	\toggletrue{art}
+	\togglefalse{unused}
+	\toggletrue{text}
+	
+	% CARD 1, FRONT
+	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
+	
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/backgroundw2.png}};
+	        \ifvar{title}{
+	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hellow2}};
+	        }{}
+	        no2222222
+	        
+	    
+	\end{tikzcard}
+	
+	% CARD 1, BACK
+	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
+	
+	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/backgroundw2_back.png}};
+	    
+	\end{tikzcard}
+	\stepcounter{cardlatex}
+	
+	
+\end{document}

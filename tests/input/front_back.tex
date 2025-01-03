@@ -1,7 +1,7 @@
-\cardlatex{
+\cardlatex[draft]{
     \front{
         \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/<$art$>.png}};
-        \if<$title$>{
+        \if[<$title$>]{
             \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{<$title$>}};
         }{}
         <$text$>
@@ -18,13 +18,14 @@
     \bleed{0.125in}
 
     \card[2]{
-        \art{background}
-        \title{hello}
-        \text{no \textbf{stars}}
+        \var[art]{background}
+        \var[title]{hel
+        lo}
+        \var[text]{no \textbf{stars}}
     }
     \card{
-        \art{backgroundw2}
-        \title{hellow2}
-        \text{no2222222}
+        \var[art]{backgroundw2}
+        \var[title]{hellow2}
+        \var[text]{no2222222}
     }
 }
