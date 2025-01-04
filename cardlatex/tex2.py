@@ -155,7 +155,7 @@ options: list[Option] = [
 ]
 
 
-def write(file: Path) -> Path:
+def write(file: Path) -> tuple[Path, bool, bool]:
     cwd = os.getcwd()
     os.chdir(file.parent)
     with open(file.name) as f:
@@ -199,4 +199,4 @@ def write(file: Path) -> Path:
                 if key.startswith('@'):
                     f.write('\n\n' + '%' * 68 + '\n% ' + key[1:].upper() + '\n\n')
                 f.write(value)
-    return out_file, is_draft
+    return out_file, is_draft, back.value is not None

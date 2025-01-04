@@ -23,7 +23,7 @@ def resample(source: Path, target: Path):
     os.utime(target, ns=(lstat.st_atime_ns, lstat.st_mtime_ns))
 
 
-def xelatex(file: Path, cache_dir: Path, is_draft: bool):
+def xelatex(file: Path, cache_dir: Path, is_draft: bool) -> Path:
     start = datetime.now()
 
     with open(file) as f:
@@ -127,6 +127,7 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool):
             os.kill(process.pid, signal.SIGTERM)
         raise e
     finally:
-        shutil.move(working_file.with_suffix('.pdf'), file.parent / (working_file.name[:-14] + '.pdf'))
-        # C:\Users\s_nor\AppData\Local\Temp\cardlatex\0f3db7b900476536a9c64da1e6fd4ce053a230c2
-
+        shutil.move(working_file.with_suffix('.pdf'), pdf := file.parent / (working_file.name[:-14] + '.pdf'))
+        shutil.move(working_file.with_suffix('.log'), file.parent / working_file.with_suffix('.log').name)
+        os.remove(working_file.with_suffix('.aux'))
+        return pdf

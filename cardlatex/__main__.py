@@ -28,10 +28,13 @@ class StreamFormatter(logging.Formatter):
 
 @click.command()
 @click.argument('tex', nargs=1, type=click.Path(exists=True))
+@click.option('--override_draft', is_flag=True, default=None)
+@click.option('--grid', default=None)
 @click.option('--debug', is_flag=True, hidden=True, default=False)
-def cardlatex(tex: Path, debug: bool):
+def cardlatex(tex: Path, override_draft: bool | None, debug: bool):
     from .tex2 import write
     from .xelatex import xelatex
+    from .pdf import grid_pdf
 
     start = datetime.now()
     file = Path(tex)
@@ -57,8 +60,8 @@ def cardlatex(tex: Path, debug: bool):
     logging_result = ''
 
     try:
-        out_file, is_draft = write(file)
-        xelatex(out_file, cache_dir, is_draft)
+        out_file, is_draft, has_back = write(file)
+        xelatex(out_file, cache_dir, override_draft if override_draft is not None else is_draft)
     except Exception as e:
         logging.error(str(e))
         logging_result = ' with errors'

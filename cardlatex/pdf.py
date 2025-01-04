@@ -15,8 +15,32 @@ def cm_to_unit(cm: float):
     return Decimal((cm / 2.54) * 72)
 
 
+def inch_to_unit(inch: float):
+    return Decimal(inch * 72)
+
+
 A4 = Rectangle(0, 0, cm_to_unit(21), cm_to_unit(29.7))
 A3 = Rectangle(0, 0, cm_to_unit(29.7), cm_to_unit(42))
+A2 = Rectangle(0, 0, cm_to_unit(42), cm_to_unit(59.4))
+
+
+def get_paper_size(n):
+    if not (0 <= n <= 10):
+        raise ValueError("Only A0 through A10 are defined in the ISO 216 A-series.")
+
+    # A0 dimensions in mm (ISO 216 rounded)
+    width, height = 84.1, 118.9
+
+    for _ in range(n):
+        if width > height:
+            width, height = height, width
+        height //= 2
+
+    # Final check to keep width < height in the returned tuple
+    if width > height:
+        width, height = height, width
+
+    return width, height
 
 
 def find_fit(big_box, small_box):
@@ -63,9 +87,9 @@ def combine_pdf(pdfs: list[Path]):
 
 
 # noinspection PyUnboundLocalVariable
-def grid_pdf(paper_: str, file: Path, has_back: bool = False):
+def grid_pdf(paper_size: str, file: Path, has_back: bool = False):
     if not file.exists():
-        raise FileNotFoundError(f'input pdf not found: {file}')
+        raise FileNotFoundError(f'PDF not found: {file}')
 
     pdf = Pdf.open(file)
     pages: List[Page] = list(pdf.pages)
@@ -80,7 +104,7 @@ def grid_pdf(paper_: str, file: Path, has_back: bool = False):
     papers = {
         **{_: [_] for _ in paper_sizes.keys()},
         'auto': ['a4', 'a3']
-    }[paper_.lower()]
+    }[paper_size.lower()]
     papers = [paper_sizes[_] for _ in papers]
 
     box = Rectangle(pages[0].mediabox)
