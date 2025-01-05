@@ -6,11 +6,6 @@ from typing import Generator, Callable, Optional
 
 from .template import template_tex
 
-graphicpaths = r"""
-\typeout{cardlatex@graphicpaths}
-\makeatletter\typein{\Ginput@path}\makeatother
-"""
-
 
 def assert_tex_length(value: str) -> str:
     value = str(value).strip()
@@ -94,16 +89,23 @@ class Option:
         self._value = None
 
 
-@dataclass
 class OptionLength(Option):
     def parse(self, content, optional=None):
-        value = str(content).strip()
-        assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', value), (
-            ValueError(f'invalid measurement value "{value}"'))
-        self.value = value
+        content = str(content).strip()
+        assert re.match(r'^\d+(\.\d+)?(cm|mm|in)?$', content), (
+            ValueError(f'invalid measurement value "{content}"'))
+        super().parse(content)
 
 
-@dataclass
+class OptionVar(Option):
+    var: Optional[str] = field(init=False)
+
+    def parse(self, content, optional=None):
+        self.var = optional
+        if not self.key == 'unvar':
+            super().parse(content)
+
+
 class OptionCard(Option):
     copies: Optional[int] = field(default=1, init=False)
 
@@ -112,26 +114,22 @@ class OptionCard(Option):
             self.copies = int(optional) if optional else 1
         except ValueError:
             raise ValueError(f'could not parse number of copies: "{optional}"')
-        self.value = content
+        super().parse(content)
 
-    def output(self, index: int, *variables: str, is_draft: bool = False):
-        var = {_: '' for _ in variables}
-        is_var = {_: False for _ in variables}
-
+    def output(self, index: int, is_draft: bool = False, **variables: dict[str: str | None]):
         for cmd, var_name, text in expand(self.value):
-            if cmd == 'var' and var_name in var:
-                var[var_name] = text.replace('\t', ' ').strip('\n ')
-                is_var[var_name] = True
+            if cmd == 'var' and var_name in variables:
+                variables[var_name] = text.replace('\t', ' ').strip('\n ')
 
-        out = '\n'.join([r'\toggle' + ('true' if is_var[v] else 'false') + '{' + v + '}' for v in variables])
+        out = '\n'.join([r'\toggle' + ('false' if text is None else 'true') + '{' + var + '}' for var, text in variables.items()])
         for i in range(self.copies if not is_draft else 1):
             for option in [front, back]:
                 text = option.value
                 if text is None:
                     continue
 
-                for _ in variables:
-                    text = text.replace(fr'\if[<${_}$>]', r'\ifvar{' + _ + '}').replace(f'<${_}$>', var[_])
+                for var, content in variables.items():
+                    text = text.replace(fr'\if[<${var}$>]', r'\ifvar{' + var + '}').replace(f'<${var}$>', '' if content is None else content)
 
                 copies = f'COPY {i + 1}, ' if self.copies > 1 else ''
                 opts = ''.join('{' + _.value + '}' for _ in (dpi, width, height))
@@ -151,7 +149,9 @@ options: list[Option] = [
     dpi := Option('dpi'),
     front := Option('front', True),
     back := Option('back'),
-    OptionCard('card')  # placeholder, will instead fill up `cards`
+    OptionCard('card'),  # placeholder,
+    OptionVar('unvar'),  # placeholder,
+    OptionVar('var')     # placeholder, will instead fill up [cards]
 ]
 
 
@@ -166,13 +166,14 @@ def write(file: Path) -> tuple[Path, bool, bool]:
     assert len(cardlatex) == 1, rf'Duplicate \cardlatex commands detected, only one \cardlatex should be present per TeX file'
     is_draft = cardlatex[0][0] == 'draft'
 
-    cards: list[OptionCard] = []
     [_.clear() for _ in options]
+    cards: list[OptionCard | OptionVar] = []
+    cards_cmd = {'card': OptionCard, 'var': OptionVar, 'unvar': OptionVar}
     for cmd, optional, text in expand(cardlatex[0][1]):
         for option in options:
             if cmd == option.key:
-                if cmd == 'card':
-                    cards.append(option := OptionCard('card'))
+                if cmd in cards_cmd:
+                    cards.append(option := cards_cmd[cmd](cmd))
                 option.parse(text, optional)
                 break
 
@@ -181,14 +182,20 @@ def write(file: Path) -> tuple[Path, bool, bool]:
         options_required_failed = ', '.join(_.key for _ in options_required_failed)
         raise ValueError(f'Missing required options: {options_required_failed}')
 
-    variables = {m.group(1) for m in re.finditer(r'<\$(\w+)\$>', front.value + (back.value if back.value is not None else ''))}
+    variables = {m.group(1): None for m in re.finditer(r'<\$(\w+)\$>', front.value + (back.value if back.value is not None else ''))}
+    content = []
+    for i, option in enumerate(cards):
+        if isinstance(option, OptionVar):
+            variables[option.var] = option.value if option.key == 'var' else None
+        else:
+            content.append(option.output(i, is_draft, **variables))
+
     tex = {
         'template': readiter(r'<\$(\w+)\$>', template_tex, templating),
-        # 'graphicspath': graphicpaths,
         '@input': readiter(r'^(.*)(\\input\{([\w.]+)})', source, inputting),
-        '@toggles': '\n'.join([r'\newtoggle{' + value + '}' for value in variables]),
+        '@toggles': '\n'.join([r'\newtoggle{' + value + '}' for value in variables.keys()]),
         '@document': '\\begin{document}\n\n\t',
-        'cards': '\n'.join(_.output(i, *variables, is_draft=is_draft) for i, _ in enumerate(cards)).replace('\n', '\n\t'),
+        'content': '\n'.join(content).replace('\n', '\n\t'),
         'enddocument': '\n\\end{document}\n'
     }
 

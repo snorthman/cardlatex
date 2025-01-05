@@ -96,35 +96,34 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % TOGGLES
 
+\newtoggle{art}
+\newtoggle{title}
 \newtoggle{text}
 \newtoggle{unused}
-\newtoggle{title}
-\newtoggle{art}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % DOCUMENT
 
 \begin{document}
 
+	\toggletrue{art}
+	\toggletrue{title}
 	\toggletrue{text}
 	\togglefalse{unused}
-	\toggletrue{title}
-	\toggletrue{art}
 	
-	% CARD 0, COPY 1, FRONT
+	% CARD 2, COPY 1, FRONT
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
 	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
 	        \ifvar{title}{
-	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{hel
-	        lo}};
+	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{qwe}};
 	        }{}
 	        no \textbf{stars}
 	        
 	    
 	\end{tikzcard}
 	
-	% CARD 0, COPY 1, BACK
+	% CARD 2, COPY 1, BACK
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
 	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background_back.png}};
@@ -133,24 +132,24 @@
 	\stepcounter{cardlatex}
 	
 	
+	\toggletrue{art}
+	\togglefalse{title}
 	\toggletrue{text}
 	\togglefalse{unused}
-	\toggletrue{title}
-	\toggletrue{art}
 	
-	% CARD 1, FRONT
+	% CARD 5, FRONT
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
 	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background.png}};
 	        \ifvar{title}{
-	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{h\textbf{ell}ow32}};
+	            \node[anchor=north,yshift=-0.5cm,white] at (T) {\textbf{}};
 	        }{}
 	        no2222222
 	        
 	    
 	\end{tikzcard}
 	
-	% CARD 1, BACK
+	% CARD 5, BACK
 	\begin{tikzcard}{2048/3.5}{2.5in}{3.5in}
 	
 	        \node[anchor=north west] at (0,0) {\includegraphics[width=\cardx]{art/background_back.png}};

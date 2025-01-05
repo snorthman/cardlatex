@@ -20,3 +20,7 @@ def test_cardlatex(click: Callable, test_dir: Path, xml: str):
 @pytest.mark.parametrize('target', ['front_back'])
 def test_cardlatex_target(click: Callable, target: str):
     click(Path(f'./tests/input/{target}.tex').as_posix())
+
+
+def test_cardlatex_path(click: Callable):
+    click(Path(r'C:\Repos\monster\tex\hero_ability.tex').as_posix())

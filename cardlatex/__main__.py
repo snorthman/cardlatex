@@ -62,7 +62,8 @@ def cardlatex(tex: Path, override_draft: bool | None, debug: bool):
         if debug:
             raise e
         else:
-            print(f'\ncardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}\n', file=sys.stderr)
+            for _ in f'cardlatex has failed, see {logging_file[1]} for details\nE > {type(e).__name__}: {e}\n'.split('\n'):
+                logging.error(_, file=sys.stderr)
     finally:
         logging.info(f'cardlatex ended in {datetime.now() - start}{logging_result}')
         logging.info(f'tempfiles are stored at\n{cache_dir.resolve()}')

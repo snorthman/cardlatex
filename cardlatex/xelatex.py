@@ -95,7 +95,7 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool) -> Path:
                 error_lns.extend(
                     [f'  >> {source_ln[_]}' for _ in range(error_ln + 1, error_ln + 3) if _ < len(source_ln)])
 
-                card = -1
+                c = -1
                 for c, card in enumerate(cards):
                     if error_ln >= card['ln']:
                         card = c
@@ -103,9 +103,10 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool) -> Path:
                             break
 
                 loc = 'Preamble'
-                if card > -1:
-                    card, side, _ = tuple(cards[card].values())
+                if c > -1:
+                    card, side, _ = tuple(cards[c].values())
                     loc = f'Card {card}, {side}'
+
                 msg = '\n'.join([f'Error in {working_file.name}: {loc}',
                                  *error_lns,
                                  'Error message was',
@@ -116,18 +117,17 @@ def xelatex(file: Path, cache_dir: Path, is_draft: bool) -> Path:
                     log = f.read()
                 m = re.search(r'Output written on (.+)pdf \((\d+)', log)
                 logging.info(working_file.name + f' completed after {datetime.now() - start}! ({m.group(2)} pages)')
-                return
+
+                shutil.move(working_file.with_suffix('.pdf'), pdf := file.parent / (working_file.name[:-14] + '.pdf'))
+                shutil.move(working_file.with_suffix('.log'), file.parent / working_file.with_suffix('.log').name)
+                os.remove(working_file.with_suffix('.aux'))
+                return pdf
 
             process.sendline(p_send)
     except Exception as e:
-        e.add_note(process.buffer.decode())
+        # e.add_note(process.buffer.decode())
         if os.name == 'nt':
             subprocess.run(['taskkill', '/PID', str(process.pid), '/F'], stdout=subprocess.PIPE)
         else:
             os.kill(process.pid, signal.SIGTERM)
         raise e
-    finally:
-        shutil.move(working_file.with_suffix('.pdf'), pdf := file.parent / (working_file.name[:-14] + '.pdf'))
-        shutil.move(working_file.with_suffix('.log'), file.parent / working_file.with_suffix('.log').name)
-        os.remove(working_file.with_suffix('.aux'))
-        return pdf
